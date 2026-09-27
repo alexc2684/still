@@ -44,6 +44,7 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
   const [reflectionBusy, setReflectionBusy] = useState(false)
   const [reflectionError, setReflectionError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [timeOfDay, setTimeOfDay] = useState('Time to sit')
   const activeRef = useRef<ActivePractice | null>(null)
   const completedIdRef = useRef<string | null>(null)
   const completingRef = useRef(false)
@@ -99,6 +100,11 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
   }, [active, acquireWakeLock, completeNaturally, releaseWakeLock])
   useEffect(() => () => releaseWakeLock(), [releaseWakeLock])
   useEffect(() => { onActiveChange?.(Boolean(active)) }, [active, onActiveChange])
+  useEffect(() => {
+    const update = () => { const hour = new Date().getHours(); setTimeOfDay(hour < 5 || hour >= 21 ? 'Late night sit' : hour < 9 ? 'Early morning sit' : hour < 12 ? 'Morning sit' : hour < 17 ? 'Afternoon sit' : 'Evening sit') }
+    update(); const interval = window.setInterval(update, 60_000)
+    return () => window.clearInterval(interval)
+  }, [])
 
   async function begin() {
     if (disabled) return
@@ -141,16 +147,17 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
   const setMood = (key: 'beforeMood' | 'duringMood' | 'afterMood', value: Mood) => setDraft(current => ({ ...current, [key]: value }))
 
   return <section className="practice-view" aria-labelledby="practice-heading">
-    <h1 id="practice-heading" className="sr-only">Timer</h1>
+    <h1 id="practice-heading" className="timer-page-heading">{timeOfDay}</h1>
     <div className={`timer-card practice-timer-card ${active ? 'is-running' : ''} ${saved ? 'is-complete' : ''}`}>
       <div className="timer-label">Timer</div>
       <div className="timer-ring"><svg viewBox="0 0 280 280" aria-hidden="true"><circle className="ring-track" cx="140" cy="140" r="126" /><circle className="ring-progress" cx="140" cy="140" r="126" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - progress)} /></svg><div className="timer-readout"><strong>{formatTime(displayRemaining)}</strong><span>{saved ? 'well done' : active ? 'remaining' : 'minutes'}</span></div></div>
       {!active && !saved && <div className="duration-control"><button aria-label="Decrease duration" onClick={() => setMinutes(value => Math.max(1, value - 1))}>−</button><label><input aria-label="Duration in minutes" inputMode="numeric" type="number" min="1" max="120" step="1" value={minutes} onChange={event => setMinutes(Math.min(120, Math.max(1, Math.round(Number(event.target.value) || 1))))} /><span>min</span></label><button aria-label="Increase duration" onClick={() => setMinutes(value => Math.min(120, value + 1))}>+</button></div>}
+      {!active && !saved && <button className="sound-preview" type="button" onClick={() => { unlockBowlAudio(); playBowl() }}>Preview sound</button>}
       {active && <button className="text-button" onClick={() => void cancel()} disabled={busy}>End session early</button>}
       {saved && <><button className="primary-button" onClick={() => setReflection(true)}>Edit reflection <span>→</span></button><button className="text-button" onClick={beginNewSession}>New session</button></>}
       {!active && !saved && <button className="primary-button" onClick={() => void begin()} disabled={busy || disabled}>{busy ? 'Starting…' : user ? disabled ? 'Group practice active' : 'Begin practice' : 'Sign in to practice'} <span>→</span></button>}
       {error && <p className="practice-error" role="alert">{error} {active && completionFailedRef.current && <button onClick={() => { completionFailedRef.current = false; void completeNaturally(active) }}>Retry save</button>}</p>}
-    </div>{!active && <div className="practice-foot"><span><span className="sound-icon">◉</span> A soft bowl will mark the end</span><span className="quiet-tip">Keep Still open while you practice</span><button className="sound-preview" type="button" onClick={() => { unlockBowlAudio(); playBowl() }}>Preview sound</button></div>}
+    </div>
     {reflection && <div className="modal-backdrop"><div className="auth-modal reflection-modal" role="dialog" aria-modal="true"><div className="eyebrow">A moment to notice</div><h2>How did it feel?</h2><p>Your reflections are private. Only your practice duration appears in the Circle.</p>{([['beforeMood','Before'],['duringMood','During'],['afterMood','After']] as const).map(([key, label]) => <fieldset className="mood-field" key={key}><legend>{label}</legend><div className="mood-options">{([1,2,3,4,5] as Mood[]).map(value => <button type="button" key={value} className={draft[key] === value ? 'selected' : ''} onClick={() => setMood(key, value)} aria-label={`${label} ${value} of 5`}>{value}</button>)}</div><small>{draft[key] ? moodWords[draft[key]! - 1] : 'choose one'}</small></fieldset>)}<label className="reflection-note">Notes<textarea value={draft.notes} onChange={event => setDraft(current => ({ ...current, notes: event.target.value }))} maxLength={6500} rows={4} placeholder="What did you notice before, during, or after?" /></label>{reflectionError && <p className="form-error" role="alert">{reflectionError}</p>}<button className="primary-button" onClick={() => void saveReflection()} disabled={reflectionBusy}>{reflectionBusy ? 'Saving…' : 'Save reflection'} <span>→</span></button><button className="text-button" onClick={() => setReflection(false)}>Skip for now</button></div></div>}
   </section>
 }
