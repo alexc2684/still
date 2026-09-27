@@ -15,3 +15,19 @@ All endpoints are same-origin JSON APIs. Auth is an httpOnly `still_session` coo
 `GET /api/feed` returns `{ feed }` with `authorName`, `sessionName`, `plannedSeconds`, `elapsedSeconds`, `kudos`, `comments`, and `viewerHasKudosed`. `POST /api/sessions/:id/kudos` toggles the current user's kudos and returns `{ kudosed }`. `GET /api/sessions/:id/comments` returns `{ comments }`; `POST` accepts `{ body }`; `DELETE /api/comments/:id` deletes an owned comment.
 
 `PATCH /api/profile` accepts `{ name?, timezone?, weeklyTarget? }` and returns `{ user }`.
+
+## Shared sits
+
+Shared sits use the existing signed-in account and an invitation token. The
+token grants access to that sit only; it does not authenticate a user.
+
+`POST /api/shared-sits` creates a host-owned sit with `{ plannedSeconds }` and
+returns `{ sit, inviteToken }`. `GET /api/shared-sits/:token` returns the sit
+and its members for signed-in invitees. `POST /api/shared-sits/:token/join`
+joins the current user once. `POST /api/shared-sits/:token/start` starts the
+host's sit. `POST /api/shared-sits/:token/leave` lets a member leave before or
+during the sit. `POST /api/shared-sits/:token/cancel` cancels a host-owned sit.
+
+Only the host can start or cancel; a signed-in user can join once and leave
+their own membership. Shared-sit session completion remains owned by the
+participant, and reflections remain private to that participant.

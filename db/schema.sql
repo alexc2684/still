@@ -3,6 +3,17 @@ CREATE TABLE IF NOT EXISTS users (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_key text;
 CREATE TABLE IF NOT EXISTS sessions (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE, token_hash text UNIQUE NOT NULL, expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS meditation_sessions (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE, started_at timestamptz NOT NULL, completed_at timestamptz, completed_local_date date, planned_seconds int NOT NULL CHECK(planned_seconds>0), elapsed_seconds int NOT NULL DEFAULT 0, name text, created_at timestamptz NOT NULL DEFAULT now());
+ALTER TABLE meditation_sessions ADD COLUMN IF NOT EXISTS shared_sit_id uuid;
+CREATE TABLE IF NOT EXISTS shared_sits (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), host_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE, invite_token text UNIQUE NOT NULL, status text NOT NULL DEFAULT 'waiting' CHECK(status IN ('waiting','running','completed','cancelled')), planned_seconds int NOT NULL CHECK(planned_seconds BETWEEN 60 AND 86400), started_at timestamptz, ends_at timestamptz, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS shared_sit_members (shared_sit_id uuid NOT NULL REFERENCES shared_sits(id) ON DELETE CASCADE, user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE, meditation_session_id uuid REFERENCES meditation_sessions(id) ON DELETE SET NULL, left_at timestamptz, joined_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(shared_sit_id,user_id));
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='meditation_sessions_shared_sit_fk' AND conrelid='meditation_sessions'::regclass) THEN
+    ALTER TABLE meditation_sessions ADD CONSTRAINT meditation_sessions_shared_sit_fk FOREIGN KEY(shared_sit_id) REFERENCES shared_sits(id) ON DELETE SET NULL;
+  END IF;
+END
+$$;
+CREATE UNIQUE INDEX IF NOT EXISTS meditation_shared_sit_member_unique ON meditation_sessions(shared_sit_id,user_id) WHERE shared_sit_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS one_completion_per_start ON meditation_sessions(user_id,started_at);
 CREATE TABLE IF NOT EXISTS reflections (session_id uuid PRIMARY KEY REFERENCES meditation_sessions(id) ON DELETE CASCADE, before_mood int CHECK(before_mood BETWEEN 1 AND 5), during_mood int CHECK(during_mood BETWEEN 1 AND 5), after_mood int CHECK(after_mood BETWEEN 1 AND 5), before_note text, during_note text, after_note text);
 CREATE TABLE IF NOT EXISTS kudos (session_id uuid REFERENCES meditation_sessions(id) ON DELETE CASCADE, user_id uuid REFERENCES users(id) ON DELETE CASCADE, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(session_id,user_id));

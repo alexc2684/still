@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './practice-timer.css'
 import { combineJournalNotes } from './journalNotes'
+import { playBowl, unlockBowlAudio } from '@/lib/bowl'
 
 export type PracticeTimerUser = { id: string; name?: string; email?: string }
 export type Mood = 1 | 2 | 3 | 4 | 5
@@ -11,6 +12,8 @@ export type PracticeTimerProps = {
   user: PracticeTimerUser | null
   onSessionSaved?: () => void
   onSignIn?: () => void
+  onActiveChange?: (active: boolean) => void
+  disabled?: boolean
 }
 
 type ActivePractice = {
@@ -24,55 +27,10 @@ type Stored = ActivePractice & { completionPending?: boolean }
 const EMPTY_DRAFT: Draft = { beforeMood: null, duringMood: null, afterMood: null, notes: '' }
 const moodWords = ['restless', 'scattered', 'steady', 'open', 'clear']
 
-let audio: AudioContext | null = null
-let bowlUntil = 0
-function audioContext() {
-  if (typeof window === 'undefined') return null
-  if (!audio) {
-    const Ctx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-    if (Ctx) audio = new Ctx()
-  }
-  return audio
-}
-function unlockAudio() {
-  const ctx = audioContext()
-  if (!ctx) return
-  // Calling resume in the click handler preserves the user gesture on iOS.
-  void ctx.resume()
-  try {
-    const osc = ctx.createOscillator(), gain = ctx.createGain()
-    gain.gain.value = 0.00001
-    osc.connect(gain).connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.02)
-  } catch { /* audio remains optional */ }
-}
-function ringBell() {
-  const ctx = audioContext()
-  if (!ctx) return
-  const wallNow = typeof performance === 'undefined' ? Date.now() : performance.now()
-  if (wallNow < bowlUntil) return
-  bowlUntil = wallNow + 9000
-  try {
-    const now = ctx.currentTime, master = ctx.createGain()
-    master.gain.value = 0.24; master.connect(ctx.destination)
-    // Modal sine resonances of a bowl: the close pairs create a slow, tactile shimmer.
-    const modes = [[180, 0.42, 9], [487.8, 0.18, 7], [486.1, 0.13, 7], [972, 0.09, 5.8], [970.9, 0.065, 5.8], [1602, 0.035, 4.2]] as const
-    modes.forEach(([frequency, amplitude, decay]) => {
-      const osc = ctx.createOscillator(), gain = ctx.createGain()
-      osc.type = 'sine'; osc.frequency.setValueAtTime(frequency, now)
-      gain.gain.setValueAtTime(0.0001, now); gain.gain.exponentialRampToValueAtTime(amplitude, now + 0.045); gain.gain.exponentialRampToValueAtTime(0.0001, now + decay)
-      osc.connect(gain).connect(master); osc.start(now); osc.stop(now + decay + 0.1)
-    })
-    const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.09), ctx.sampleRate), samples = buffer.getChannelData(0)
-    for (let index = 0; index < samples.length; index += 1) samples[index] = (Math.random() * 2 - 1) * (1 - index / samples.length)
-    const strike = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), strikeGain = ctx.createGain()
-    strike.buffer = buffer; filter.type = 'lowpass'; filter.frequency.setValueAtTime(1800, now); strikeGain.gain.setValueAtTime(0.035, now); strikeGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16)
-    strike.connect(filter).connect(strikeGain).connect(master); strike.start(now)
-  } catch { /* restrictive browsers can refuse audio */ }
-}
 function formatTime(seconds: number) { return `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}` }
 function jsonBody(response: Response) { return response.json().catch(() => ({})) as Promise<{ error?: string; session?: { id: string; started_at?: string; startedAt?: string; planned_seconds?: number; plannedSeconds?: number } }>; }
 
-export default function PracticeTimer({ user, onSessionSaved, onSignIn }: PracticeTimerProps) {
+export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActiveChange, disabled = false }: PracticeTimerProps) {
   const storageKey = user ? `still:practice:${user.id}` : null
   const draftKey = user ? `still:reflection:${user.id}` : null
   const reflectionSessionKey = user ? `still:reflection-session:${user.id}` : null
@@ -133,17 +91,19 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn }: Practi
   useEffect(() => {
     if (!active) { releaseWakeLock(); return }
     void acquireWakeLock()
-    const tick = () => { const next = Math.max(0, Math.ceil((active.deadlineMs - Date.now()) / 1000)); setRemaining(next); if (next <= 0 && !cancelingRef.current) { if (!bellPlayedRef.current) { bellPlayedRef.current = true; ringBell() } if (!completionFailedRef.current) void completeNaturally(active) } }
+    const tick = () => { const next = Math.max(0, Math.ceil((active.deadlineMs - Date.now()) / 1000)); setRemaining(next); if (next <= 0 && !cancelingRef.current) { if (!bellPlayedRef.current) { bellPlayedRef.current = true; playBowl() } if (!completionFailedRef.current) void completeNaturally(active) } }
     tick(); const id = window.setInterval(tick, 250)
     const visibility = () => { if (document.visibilityState === 'visible') void acquireWakeLock() }
     document.addEventListener('visibilitychange', visibility)
     return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', visibility) }
   }, [active, acquireWakeLock, completeNaturally, releaseWakeLock])
   useEffect(() => () => releaseWakeLock(), [releaseWakeLock])
+  useEffect(() => { onActiveChange?.(Boolean(active)) }, [active, onActiveChange])
 
   async function begin() {
+    if (disabled) return
     if (!user) { onSignIn?.(); return }
-    unlockAudio(); completionFailedRef.current = false; bellPlayedRef.current = false; cancelingRef.current = false; setBusy(true); setError('')
+    unlockBowlAudio(); completionFailedRef.current = false; bellPlayedRef.current = false; cancelingRef.current = false; setBusy(true); setError('')
     try {
       const response = await fetch('/api/sessions/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plannedSeconds: minutes * 60 }) })
       const body = await jsonBody(response)
@@ -188,9 +148,9 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn }: Practi
       {!active && !saved && <div className="duration-control"><button aria-label="Decrease duration" onClick={() => setMinutes(value => Math.max(1, value - 1))}>−</button><label><input aria-label="Duration in minutes" inputMode="numeric" type="number" min="1" max="120" step="1" value={minutes} onChange={event => setMinutes(Math.min(120, Math.max(1, Math.round(Number(event.target.value) || 1))))} /><span>min</span></label><button aria-label="Increase duration" onClick={() => setMinutes(value => Math.min(120, value + 1))}>+</button></div>}
       {active && <button className="text-button" onClick={() => void cancel()} disabled={busy}>End session early</button>}
       {saved && <><button className="primary-button" onClick={() => setReflection(true)}>Edit reflection <span>→</span></button><button className="text-button" onClick={beginNewSession}>New session</button></>}
-      {!active && !saved && <button className="primary-button" onClick={() => void begin()} disabled={busy}>{busy ? 'Starting…' : user ? 'Begin practice' : 'Sign in to practice'} <span>→</span></button>}
+      {!active && !saved && <button className="primary-button" onClick={() => void begin()} disabled={busy || disabled}>{busy ? 'Starting…' : user ? disabled ? 'Group practice active' : 'Begin practice' : 'Sign in to practice'} <span>→</span></button>}
       {error && <p className="practice-error" role="alert">{error} {active && completionFailedRef.current && <button onClick={() => { completionFailedRef.current = false; void completeNaturally(active) }}>Retry save</button>}</p>}
-    </div><div className="practice-foot"><span><span className="sound-icon">◉</span> A soft bowl will mark the end</span><span className="quiet-tip">Keep Still open while you practice</span><button className="sound-preview" type="button" onClick={() => { unlockAudio(); ringBell() }} disabled={Boolean(active)}>Preview sound</button></div>
+    </div><div className="practice-foot"><span><span className="sound-icon">◉</span> A soft bowl will mark the end</span><span className="quiet-tip">Keep Still open while you practice</span><button className="sound-preview" type="button" onClick={() => { unlockBowlAudio(); playBowl() }} disabled={Boolean(active)}>Preview sound</button></div>
     {reflection && <div className="modal-backdrop"><div className="auth-modal reflection-modal" role="dialog" aria-modal="true"><div className="eyebrow">A moment to notice</div><h2>How did it feel?</h2><p>Your reflections are private. Only your practice duration appears in the Circle.</p>{([['beforeMood','Before'],['duringMood','During'],['afterMood','After']] as const).map(([key, label]) => <fieldset className="mood-field" key={key}><legend>{label}</legend><div className="mood-options">{([1,2,3,4,5] as Mood[]).map(value => <button type="button" key={value} className={draft[key] === value ? 'selected' : ''} onClick={() => setMood(key, value)} aria-label={`${label} ${value} of 5`}>{value}</button>)}</div><small>{draft[key] ? moodWords[draft[key]! - 1] : 'choose one'}</small></fieldset>)}<label className="reflection-note">Notes<textarea value={draft.notes} onChange={event => setDraft(current => ({ ...current, notes: event.target.value }))} maxLength={6500} rows={4} placeholder="What did you notice before, during, or after?" /></label>{reflectionError && <p className="form-error" role="alert">{reflectionError}</p>}<button className="primary-button" onClick={() => void saveReflection()} disabled={reflectionBusy}>{reflectionBusy ? 'Saving…' : 'Save reflection'} <span>→</span></button><button className="text-button" onClick={() => setReflection(false)}>Skip for now</button></div></div>}
   </section>
 }

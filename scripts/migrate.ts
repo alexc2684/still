@@ -1,3 +1,3 @@
 import { readFile } from 'node:fs/promises'; import { sql } from '../src/lib/db';
 try { process.loadEnvFile('.env.local'); } catch {}
-void (async()=>{ const text=await readFile(new URL('../db/schema.sql',import.meta.url),'utf8'); for (const statement of text.split(';').map(x=>x.trim()).filter(Boolean)) await sql()(statement); console.log('migrated'); })();
+void (async()=>{ const text=await readFile(new URL('../db/schema.sql',import.meta.url),'utf8'); const statements:string[]=[]; let current='',dollar=false; for(const line of text.split('\n')){current+=line+'\n'; if(line.includes('$$')) dollar=!dollar; if(!dollar&&line.trim().endsWith(';')){statements.push(current.trim().slice(0,-1));current='';}} if(current.trim())statements.push(current.trim()); for(const statement of statements.filter(Boolean)) await sql()(statement); console.log('migrated'); })();

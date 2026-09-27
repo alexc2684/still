@@ -1,3 +1,4 @@
+.shared-participants{display:flex;align-items:center;gap:10px;margin-top:14px;color:var(--muted);font-size:11px;line-height:1.4}.participant-avatars{display:flex;padding-left:5px}.participant-avatars>*{margin-left:-5px;border:2px solid var(--surface)}
 .circle-view .circle-error{margin:-14px 0 16px;padding:10px 12px;border:1px solid #d9c7bf;background:#fbf3ef;border-radius:7px;color:#8b4c43;font-size:12px}
 .circle-actions{display:flex;gap:8px;margin-top:15px;padding-top:13px;border-top:1px solid var(--line)}
 .circle-actions button{min-height:44px;display:inline-flex;align-items:center;gap:7px;padding:0 12px;border-radius:7px;background:transparent;color:var(--ink);font-size:13px}

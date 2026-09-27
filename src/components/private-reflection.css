@@ -1,0 +1,12 @@
+.private-reflection { background: var(--surface); border-radius: 12px; padding: 30px; width: min(100%, 430px); }
+.private-reflection h2 { margin-top: 12px; }
+.private-reflection > p { color: var(--muted); margin: 9px 0 18px; }
+.private-mood { border: 0; margin: 18px 0 0; padding: 0; }
+.private-mood legend { color: var(--muted); font-size: 11px; }
+.private-mood div { display: flex; gap: 8px; margin-top: 8px; }
+.private-mood button { width: 35px; height: 35px; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: var(--muted); }
+.private-mood button.selected { background: var(--sage-dark); border-color: var(--sage-dark); color: #fff; }
+.private-mood small { color: var(--sage-dark); display: block; font: 10px 'DM Mono', monospace; margin-top: 6px; }
+.private-notes { color: var(--muted); display: block; font-size: 11px; margin: 22px 0 17px; }
+.private-notes textarea { background: #fff; border: 1px solid var(--line); border-radius: 5px; color: var(--ink); display: block; margin-top: 7px; padding: 10px; resize: vertical; width: 100%; }
+.private-reflection .text-button { display: block; margin: 10px auto 0; }

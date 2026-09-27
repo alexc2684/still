@@ -2,6 +2,12 @@
 
 Still is a meditation timer and social practice log deployed as a Next.js PWA.
 
+For a shared practice, open **Together** from Practice, create a sit, and share
+the invitation link with friends. Friends sign in with their existing Still
+account, open the link, and choose **Join**. The host starts the sit when ready;
+each participant receives a private reflection afterward. The invitation link
+joins a shared session and is not a passwordless authentication mechanism.
+
 ## Local setup
 
 Install dependencies and copy the Vercel-provided environment file:
