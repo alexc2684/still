@@ -1,0 +1,30 @@
+.journal-entries { margin-top: 28px; }
+.reflection-moods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 18px; }
+.reflection-moods span, .reflection-notes p { color: var(--muted); font-size: 11px; line-height: 1.45; }
+.reflection-moods b, .reflection-notes b { display: block; color: var(--ink); font: 500 10px 'DM Mono', monospace; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 3px; }
+.reflection-notes { margin: 17px 0 10px; display: grid; gap: 8px; }
+.reflection-notes-block { white-space: pre-wrap; color: var(--muted); font-size: 12px; line-height: 1.55; margin: 17px 0 10px; }
+.reflection-form { margin-top: 18px; display: grid; gap: 17px; }
+.mood-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.reflection-stage { display: grid; gap: 8px; }
+.reflection-stage textarea { width: 100%; min-height: 62px; resize: vertical; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); padding: 10px; color: var(--ink); font-size: 12px; }
+.notes-field { display: grid; gap: 8px; }
+.notes-field textarea { width: 100%; min-height: 100px; resize: vertical; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); padding: 10px; color: var(--ink); font-size: 12px; }
+.mood-picker { display: flex; gap: 6px; }
+.mood-picker button { width: 27px; height: 27px; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: var(--muted); font-size: 11px; }
+.mood-picker button.selected { border-color: var(--sage-dark); background: var(--sage-dark); color: #fff; }
+.reflection-form > div:last-child { display: flex; align-items: center; gap: 10px; }
+.form-success { color: var(--sage-dark); font-size: 11px; margin: 12px 0; }
+.profile-setting { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); padding: 17px 3px; }
+.profile-setting > span { width: 30px; color: var(--sage-dark); font-size: 18px; }
+.profile-setting div { flex: 1; display: grid; gap: 4px; }
+.profile-setting strong { font-size: 12px; font-weight: 600; }
+.profile-setting small { color: var(--muted); font-size: 11px; }
+.profile-setting select { border: 1px solid var(--line); border-radius: 5px; padding: 7px 8px; background: var(--surface); color: var(--ink); font-size: 11px; }
+.install-help { border-bottom: 1px solid var(--line); padding: 17px 3px; font-size: 12px; }
+.install-help summary { cursor: pointer; color: var(--ink); }
+.install-help p { color: var(--muted); font-size: 11px; line-height: 1.5; margin: 12px 0 0 42px; }
+.profile-action { display: flex; width: 100%; gap: 12px; align-items: center; background: transparent; border-bottom: 1px solid var(--line); padding: 17px 3px; text-align: left; }
+.profile-action span { width: 30px; color: var(--sage-dark); font-size: 18px; }
+.profile-action strong { font-size: 12px; font-weight: 600; }
+@media (max-width: 600px) { .reflection-moods, .mood-row { grid-template-columns: 1fr; gap: 12px; } }

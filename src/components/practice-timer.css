@@ -1,0 +1,9 @@
+.practice-timer-card { position: relative; }
+.practice-timer-card .primary-button { margin-top: 5px; }
+.practice-timer-card .text-button:disabled { opacity: .55; cursor: wait; }
+.practice-error { width: min(100%, 430px); margin: 18px 0 0; color: #a14e42; font-size: 11px; line-height: 1.5; text-align: center; }
+.practice-error button { padding: 0; background: transparent; color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.reflection-modal { max-height: min(92svh, 760px); }
+.reflection-modal .text-button { display: block; margin: 10px auto 0; }
+.sound-preview { background: transparent; color: var(--sage-dark); font-size: 11px; padding: 4px 0; text-decoration: underline; text-underline-offset: 3px; }
+.sound-preview:disabled { opacity: .45; cursor: default; }

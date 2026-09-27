@@ -1,0 +1,10 @@
+node_modules/
+.next/
+.vercel/
+.agents/
+.env*
+!.env.example
+*.log
+*.tsbuildinfo
+playwright-report/
+test-results/

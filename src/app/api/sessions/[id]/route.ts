@@ -1,0 +1,2 @@
+import { requireUser,json,originGuard } from '@/lib/http'; import { sql } from '@/lib/db';
+export async function DELETE(req:Request,{params}:{params:Promise<{id:string}>}){try{await originGuard();const u=await requireUser(),{id}=await params;const r=await sql()(`DELETE FROM meditation_sessions WHERE id=$1 AND user_id=$2 RETURNING id`,[id,u.id]);return r[0]?json({ok:true}):json({error:'Not found'},404)}catch(e){return e instanceof Response?e:json({error:'Unable to delete session'},500)}}

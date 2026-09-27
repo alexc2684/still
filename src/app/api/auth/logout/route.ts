@@ -1,0 +1,2 @@
+import { cookies } from 'next/headers'; import { sql } from '@/lib/db'; import { tokenHash } from '@/lib/security'; import { json,originGuard } from '@/lib/http';
+export async function POST(){await originGuard();const c=await cookies(),n=process.env.SESSION_COOKIE_NAME||'still_session',t=c.get(n)?.value;if(t)await sql()(`DELETE FROM sessions WHERE token_hash=$1`,[tokenHash(t)]);c.delete(n);return json({ok:true})}

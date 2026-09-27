@@ -1,0 +1,2 @@
+import { sql } from './db';
+export async function authRateLimit(key:string, max=10) { const db=sql(); await db(`DELETE FROM auth_attempts WHERE created_at < now()-interval '1 hour'`); const count=(await db(`SELECT COUNT(*)::int AS n FROM auth_attempts WHERE attempt_key=$1 AND created_at > now()-interval '15 minutes'`,[key]))[0]?.n ?? 0; await db(`INSERT INTO auth_attempts(attempt_key) VALUES($1)`,[key]); return count < max; }

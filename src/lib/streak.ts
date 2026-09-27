@@ -1,0 +1,3 @@
+export function dateInTimezone(date:Date, timezone:string) { return new Intl.DateTimeFormat('en-CA',{timeZone:timezone}).format(date); }
+export function streakFromDates(dates:string[], today:string) { const set=new Set(dates); let n=0; let d=new Date(`${today}T12:00:00Z`); while(set.has(d.toISOString().slice(0,10))){n++; d.setUTCDate(d.getUTCDate()-1);} return n; }
+export function currentStreak(dates:string[], today:string) { const set=new Set(dates); const d=new Date(`${today}T12:00:00Z`); if(!set.has(today)) d.setUTCDate(d.getUTCDate()-1); return streakFromDates([...set],d.toISOString().slice(0,10)); }
