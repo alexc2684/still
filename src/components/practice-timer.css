@@ -7,3 +7,4 @@
 .reflection-modal .text-button { display: block; margin: 10px auto 0; }
 .sound-preview { background: transparent; color: var(--sage-dark); font-size: 11px; padding: 4px 0; text-decoration: underline; text-underline-offset: 3px; }
 .sound-preview:disabled { opacity: .45; cursor: default; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
