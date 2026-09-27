@@ -1,0 +1,31 @@
+name: Still practice reminders
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Query due users without sending notifications'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Skip until the cron secret is configured
+        if: ${{ env.CRON_SECRET == '' }}
+        run: echo 'CRON_SECRET is not configured; no reminder dispatch was attempted.'
+      - name: Dispatch due reminders
+        if: ${{ env.CRON_SECRET != '' }}
+        run: |
+          endpoint='https://still-meditation-ashen.vercel.app/api/reminders/dispatch'
+          if [ "${{ github.event_name }}" = 'workflow_dispatch' ] && [ "${{ inputs.dry_run }}" = 'true' ]; then endpoint="$endpoint?dryRun=1"; fi
+          curl --fail --silent --show-error --retry 3 --retry-delay 5 --max-time 90 -X POST -H "Authorization: Bearer ${CRON_SECRET}" "$endpoint"

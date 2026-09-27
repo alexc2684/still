@@ -1,1 +1,1 @@
-import { requireUser,json } from '@/lib/http'; export async function GET(){try{const u=await requireUser();return json({user:{...u,weeklyTarget:u.weekly_target}})}catch(e){return e instanceof Response?e:json({error:'Unauthorized'},401)}}
+import { requireUser,json } from '@/lib/http'; export async function GET(){try{const u=await requireUser();return json({user:{...u,weeklyTarget:u.weekly_target,weeklyMinutesTarget:u.weekly_minutes_target??null}})}catch(e){return e instanceof Response?e:json({error:'Unauthorized'},401)}}

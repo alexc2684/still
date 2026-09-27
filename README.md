@@ -41,3 +41,8 @@ The timer uses elapsed wall-clock time so it does not drift when a tab is
 backgrounded. Browser audio requires an initial user gesture. The end bell is
 supported while the page is active; iOS background or locked-screen audio needs
 on-device verification and is not guaranteed by a web PWA.
+
+Phone practice reminders are opt-in. The browser asks for notification
+permission only after the user taps Enable in Profile. Delivery runs hourly on
+the free public-repository GitHub Actions runner and is best effort around the
+chosen local hour; it does not promise exact-minute delivery.

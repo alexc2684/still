@@ -31,3 +31,19 @@ during the sit. `POST /api/shared-sits/:token/cancel` cancels a host-owned sit.
 Only the host can start or cancel; a signed-in user can join once and leave
 their own membership. Shared-sit session completion remains owned by the
 participant, and reflections remain private to that participant.
+
+## Phone reminders
+
+`GET /api/reminders` returns `{ settings, enabled, hour, days, timezone,
+vapidPublicKey }`. `PATCH /api/reminders` accepts `{ enabled?, hour?: 0..23,
+days?: [0..6] }`; day indexes are Monday `0` through Sunday `6`, and at least
+one day must remain selected. Settings are disabled by default. `GET
+/api/reminders/vapid-public-key` returns the public browser key. `POST
+/api/reminders/subscriptions` stores the current signed-in device subscription;
+`DELETE` accepts `{ endpoint }` and removes only that user's subscription.
+
+The hourly delivery job is best effort and sends within an approximate window
+around the selected local hour. It skips users who practiced that day or whose
+weekly days and minutes goals are both complete. The service worker handles
+closed-app notifications; iPhone users must first install Still on the Home
+Screen and grant notification permission from the app.

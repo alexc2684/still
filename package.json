@@ -15,12 +15,14 @@
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "web-push": "^3.6.7",
     "zod": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "@types/web-push": "^3.6.4",
     "playwright": "^1.63.0",
     "tsx": "latest",
     "typescript": "latest",

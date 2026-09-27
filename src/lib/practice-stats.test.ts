@@ -1,0 +1,2 @@
+import { describe,expect,it } from 'vitest'; import { bestStreak,streak,mondayStart } from './practice-stats';
+describe('practice stats',()=>{it('keeps a yesterday streak alive',()=>expect(streak(['2026-09-25'],'2026-09-26')).toBe(1));it('finds best streak',()=>expect(bestStreak(['2026-09-20','2026-09-21','2026-09-23'])).toBe(2));it('uses Monday weeks',()=>expect(mondayStart('2026-09-23')).toBe('2026-09-21'));});

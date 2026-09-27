@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import './practice-timer.css'
 import { combineJournalNotes } from './journalNotes'
 import { playBowl, unlockBowlAudio } from '@/lib/bowl'
+import TimerDial from './TimerDial'
 
 export type PracticeTimerUser = { id: string; name?: string; email?: string }
 export type Mood = 1 | 2 | 3 | 4 | 5
@@ -27,7 +28,6 @@ type Stored = ActivePractice & { completionPending?: boolean }
 const EMPTY_DRAFT: Draft = { beforeMood: null, duringMood: null, afterMood: null, notes: '' }
 const moodWords = ['restless', 'scattered', 'steady', 'open', 'clear']
 
-function formatTime(seconds: number) { return `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}` }
 function jsonBody(response: Response) { return response.json().catch(() => ({})) as Promise<{ error?: string; session?: { id: string; started_at?: string; startedAt?: string; planned_seconds?: number; plannedSeconds?: number } }>; }
 
 export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActiveChange, disabled = false }: PracticeTimerProps) {
@@ -141,17 +141,14 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
     hydratedDraftKeyRef.current = null
     try { if (draftKey) localStorage.removeItem(draftKey); if (reflectionSessionKey) localStorage.removeItem(reflectionSessionKey) } catch { /* storage is optional */ }
   }
-  const progress = active ? Math.min(1, Math.max(0, 1 - remaining / active.plannedSeconds)) : saved ? 1 : 0
   const displayRemaining = active ? remaining : saved ? 0 : minutes * 60
-  const circumference = 2 * Math.PI * 126
   const setMood = (key: 'beforeMood' | 'duringMood' | 'afterMood', value: Mood) => setDraft(current => ({ ...current, [key]: value }))
 
   return <section className="practice-view" aria-labelledby="practice-heading">
     <h1 id="practice-heading" className="timer-page-heading">{timeOfDay}</h1>
     <div className={`timer-card practice-timer-card ${active ? 'is-running' : ''} ${saved ? 'is-complete' : ''}`}>
       <div className="timer-label">Timer</div>
-      <div className="timer-ring"><svg viewBox="0 0 280 280" aria-hidden="true"><circle className="ring-track" cx="140" cy="140" r="126" /><circle className="ring-progress" cx="140" cy="140" r="126" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - progress)} /></svg><div className="timer-readout"><strong>{formatTime(displayRemaining)}</strong><span>{saved ? 'well done' : active ? 'remaining' : 'minutes'}</span></div></div>
-      {!active && !saved && <div className="duration-control"><button aria-label="Decrease duration" onClick={() => setMinutes(value => Math.max(1, value - 1))}>−</button><label><input aria-label="Duration in minutes" inputMode="numeric" type="number" min="1" max="120" step="1" value={minutes} onChange={event => setMinutes(Math.min(120, Math.max(1, Math.round(Number(event.target.value) || 1))))} /><span>min</span></label><button aria-label="Increase duration" onClick={() => setMinutes(value => Math.min(120, value + 1))}>+</button></div>}
+      <TimerDial durationMinutes={active ? Math.round(active.plannedSeconds / 60) : minutes} remainingSeconds={displayRemaining} running={Boolean(active)} disabled={Boolean(active || saved)} onDurationChange={active || saved ? undefined : setMinutes} phaseLabel={saved ? 'well done' : active ? 'remaining' : 'minutes'} />
       {!active && !saved && <button className="sound-preview" type="button" onClick={() => { unlockBowlAudio(); playBowl() }}>Preview sound</button>}
       {active && <button className="text-button" onClick={() => void cancel()} disabled={busy}>End session early</button>}
       {saved && <><button className="primary-button" onClick={() => setReflection(true)}>Edit reflection <span>→</span></button><button className="text-button" onClick={beginNewSession}>New session</button></>}

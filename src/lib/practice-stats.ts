@@ -1,0 +1,5 @@
+export type PracticeDay={date:string;seconds:number};
+export function streak(dates:string[],today:string){const set=new Set(dates),cursor=new Date(`${set.has(today)?today:today}T12:00:00Z`);if(!set.has(today))cursor.setUTCDate(cursor.getUTCDate()-1);let n=0;while(set.has(cursor.toISOString().slice(0,10))){n++;cursor.setUTCDate(cursor.getUTCDate()-1);}return n;}
+export function bestStreak(dates:string[]){const set=new Set(dates);let best=0;for(const date of set){const prev=new Date(`${date}T12:00:00Z`);prev.setUTCDate(prev.getUTCDate()-1);if(set.has(prev.toISOString().slice(0,10)))continue;let n=0,cursor=new Date(`${date}T12:00:00Z`);while(set.has(cursor.toISOString().slice(0,10))){n++;cursor.setUTCDate(cursor.getUTCDate()+1);}best=Math.max(best,n);}return best;}
+export function mondayStart(date:string){const d=new Date(`${date}T12:00:00Z`);const day=d.getUTCDay()||7;d.setUTCDate(d.getUTCDate()-day+1);return d.toISOString().slice(0,10);}
+export function addDays(date:string,n:number){const d=new Date(`${date}T12:00:00Z`);d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}

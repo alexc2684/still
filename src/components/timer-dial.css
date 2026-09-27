@@ -1,0 +1,9 @@
+.timer-dial { width: min(74vw, 280px); aspect-ratio: 1; margin: 14px auto 20px; position: relative; touch-action: auto; }.timer-dial.is-interactive { touch-action: none; }
+.timer-dial svg { display: block; width: 100%; height: 100%; transform: rotate(0deg); }
+.timer-dial-track, .timer-dial-progress { fill: none; stroke-width: 1.5; }
+.timer-dial-track { stroke: #dfe2da; }.timer-dial-progress { stroke: var(--sage-dark); stroke-linecap: round; transition: stroke-dashoffset .3s linear; transform: rotate(-90deg); transform-origin: 140px 140px; }
+.timer-dial-thumb { fill: var(--sage-dark); stroke: var(--surface); stroke-width: 3; }
+.timer-dial-center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; }.timer-dial-center strong { font-size: 48px; letter-spacing: -.08em; line-height: 1; font-weight: 500; }.timer-dial-center span { color: var(--muted); font: 10px 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .1em; margin-top: 10px; }
+.timer-dial-duration { position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; }.timer-dial-duration input { width: 43px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); font: 500 16px 'DM Mono', monospace; text-align: center; }.timer-dial-duration input::-webkit-inner-spin-button { appearance: none; }
+.timer-dial-slider { position: absolute; inset: 0; border-radius: 50%; outline: none; pointer-events: none; }.timer-dial-slider:focus-visible { outline: 3px solid rgba(100,130,105,.45); outline-offset: 6px; }
+@media (max-width: 600px) { .timer-dial { width: clamp(180px, min(58vw, 28svh), 230px); } }
