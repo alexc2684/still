@@ -1,5 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-CREATE TABLE IF NOT EXISTS users (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text UNIQUE NOT NULL, password_hash text NOT NULL, name text NOT NULL, timezone text NOT NULL DEFAULT 'UTC', weekly_target int NOT NULL DEFAULT 7 CHECK (weekly_target BETWEEN 1 AND 7), created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS users (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text UNIQUE NOT NULL, password_hash text NOT NULL, name text NOT NULL, timezone text NOT NULL DEFAULT 'UTC', weekly_target int NOT NULL DEFAULT 7 CHECK (weekly_target BETWEEN 1 AND 7), avatar_key text, created_at timestamptz NOT NULL DEFAULT now());
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_key text;
 CREATE TABLE IF NOT EXISTS sessions (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE, token_hash text UNIQUE NOT NULL, expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS meditation_sessions (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE, started_at timestamptz NOT NULL, completed_at timestamptz, completed_local_date date, planned_seconds int NOT NULL CHECK(planned_seconds>0), elapsed_seconds int NOT NULL DEFAULT 0, name text, created_at timestamptz NOT NULL DEFAULT now());
 CREATE UNIQUE INDEX IF NOT EXISTS one_completion_per_start ON meditation_sessions(user_id,started_at);

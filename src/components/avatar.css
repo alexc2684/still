@@ -1,0 +1,9 @@
+.still-avatar{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;line-height:1;border-radius:50%;background:#dce6d7;color:var(--sage-dark);font-weight:700}.still-avatar-small{width:26px;height:26px;font-size:9px}.still-avatar-medium{width:32px;height:32px;font-size:11px}.still-avatar-large{width:70px;height:70px;font-size:24px}.still-avatar svg{display:block;flex:0 0 auto}
+.avatar-picker { padding: 17px 3px; border-bottom: 1px solid var(--line); }
+.avatar-picker > strong, .avatar-picker > small { display: block; }
+.avatar-picker > strong { font-size: 12px; }.avatar-picker > small { color: var(--muted); font-size: 11px; margin-top: 4px; }
+.avatar-options { display: flex; gap: 8px; margin-top: 13px; flex-wrap: wrap; }.avatar-options button { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--sage-dark); }.avatar-options button.selected { border: 2px solid var(--sage-dark); background: #e5ece1; }
+.settings-list .avatar-options button { width: 44px; height: 44px; min-width: 44px; padding: 0; display: grid; place-items: center; }
+.settings-list .avatar-options button > .still-avatar { width: 26px; height: 26px; min-width: 26px; line-height: 1; font-size: 11px; }
+.topbar .avatar { padding: 0; background: transparent; border: 0; }
+.topbar .avatar > .still-avatar { width: 32px; height: 32px; }
