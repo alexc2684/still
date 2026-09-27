@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Avatar, { AVATAR_KEYS, type AvatarKey } from './Avatar'
 
-type User = { id: string; name: string; email: string; timezone: string; weeklyTarget: number }
+type User = { id: string; name: string; email: string; timezone: string; weeklyTarget: number; avatarKey?: AvatarKey | null }
 
 export default function Profile({ signedIn = true, onSignIn, onSignOut, onProfileUpdated }: { signedIn?: boolean; onSignIn?: () => void; onSignOut?: () => void; onProfileUpdated?: (user: User) => void }) {
   const [user, setUser] = useState<User | null>(null)
@@ -11,10 +12,12 @@ export default function Profile({ signedIn = true, onSignIn, onSignOut, onProfil
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [avatarKey, setAvatarKey] = useState<AvatarKey | null>(null)
+  const [avatarSaving, setAvatarSaving] = useState(false)
 
   useEffect(() => {
     if (!signedIn) return
-    fetch('/api/auth/me').then(async response => { if (!response.ok) throw new Error('Please sign in again.'); const body = await response.json(); setUser(body.user); setGoal(body.user.weeklyTarget) }).catch(err => setError(err instanceof Error ? err.message : 'Unable to load profile.')).finally(() => setLoading(false))
+    fetch('/api/auth/me').then(async response => { if (!response.ok) throw new Error('Please sign in again.'); const body = await response.json(); setUser(body.user); setGoal(body.user.weeklyTarget); setAvatarKey(body.user.avatarKey ?? null) }).catch(err => setError(err instanceof Error ? err.message : 'Unable to load profile.')).finally(() => setLoading(false))
   }, [signedIn])
 
   async function saveGoal(value: number) {
@@ -28,6 +31,11 @@ export default function Profile({ signedIn = true, onSignIn, onSignOut, onProfil
     finally { setSaving(false) }
   }
 
+  async function saveAvatar(value: AvatarKey | null) {
+    const previous = avatarKey; setAvatarKey(value); setAvatarSaving(true); setError('')
+    try { const response = await fetch('/api/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ avatarKey: value }) }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error ?? 'Unable to save avatar.'); setUser(body.user); onProfileUpdated?.(body.user); setMessage('Avatar saved.') } catch (err) { setAvatarKey(previous); setError(err instanceof Error ? err.message : 'Unable to save avatar.') } finally { setAvatarSaving(false) }
+  }
+
   async function logout() {
     const response = await fetch('/api/auth/logout', { method: 'POST' })
     if (!response.ok) { setError('Unable to sign out.'); return }
@@ -38,5 +46,5 @@ export default function Profile({ signedIn = true, onSignIn, onSignOut, onProfil
   if (loading) return <section className="content-view"><div className="loading-state">Loading your profile…</div></section>
   if (!user) return <section className="content-view"><p className="form-error" role="alert">{error || 'Unable to load your profile.'}</p></section>
 
-  return <section className="content-view" aria-labelledby="profile-heading"><div className="profile-hero"><span className="profile-avatar-large">{user.name.slice(0, 1).toUpperCase()}</span><div><div className="eyebrow">Your profile</div><h1 id="profile-heading">{user.name}</h1><p>{user.email}</p></div></div>{error && <p className="form-error" role="alert">{error}</p>}{message && <p className="form-success" role="status">{message}</p>}<div className="profile-card"><div><span className="eyebrow">Weekly rhythm</span><strong>{goal} {goal === 1 ? 'day' : 'days'}</strong></div><span className="streak-spark">✦</span></div><div className="settings-list"><label className="profile-setting"><span>◌</span><div><strong>Weekly goal</strong><small>Choose how often you want to practice.</small></div><select aria-label="Weekly practice goal" value={goal} disabled={saving} onChange={event => void saveGoal(Number(event.target.value))}>{[1, 2, 3, 4, 5, 6, 7].map(value => <option key={value} value={value}>{value} {value === 1 ? 'day' : 'days'}</option>)}</select></label><div className="profile-setting"><span>⌁</span><div><strong>Timezone</strong><small>{user.timezone}</small></div></div><details className="install-help"><summary>Install Still on iPhone</summary><p>In Safari, tap the Share button, choose <strong>Add to Home Screen</strong>, then tap Add. Still will open like an app and keep your practice close.</p></details><button className="profile-action" onClick={() => void logout()}><span>↗</span><strong>Sign out</strong></button></div></section>
+  return <section className="content-view" aria-labelledby="profile-heading"><div className="profile-hero"><Avatar name={user.name} avatarKey={avatarKey} size="large" /><div><div className="eyebrow">Your profile</div><h1 id="profile-heading">{user.name}</h1><p>{user.email}</p></div></div>{error && <p className="form-error" role="alert">{error}</p>}{message && <p className="form-success" role="status">{message}</p>}<div className="profile-card"><div><span className="eyebrow">Weekly rhythm</span><strong>{goal} {goal === 1 ? 'day' : 'days'}</strong></div><span className="streak-spark">✦</span></div><div className="settings-list"><div className="avatar-picker"><strong>Choose your mark</strong><small>A small symbol for your practice.</small><div className="avatar-options"><button className={!avatarKey ? 'selected' : ''} onClick={() => void saveAvatar(null)} aria-label="Use initials" aria-pressed={!avatarKey} disabled={avatarSaving}><Avatar name={user.name} size="small" /></button>{AVATAR_KEYS.map(key => <button key={key} className={avatarKey === key ? 'selected' : ''} onClick={() => void saveAvatar(key)} aria-label={'Use ' + key + ' avatar'} aria-pressed={avatarKey === key} disabled={avatarSaving}><Avatar name={user.name} avatarKey={key} size="small" /></button>)}</div></div><label className="profile-setting"><span>◌</span><div><strong>Weekly goal</strong><small>Choose how often you want to practice.</small></div><select aria-label="Weekly practice goal" value={goal} disabled={saving} onChange={event => void saveGoal(Number(event.target.value))}>{[1, 2, 3, 4, 5, 6, 7].map(value => <option key={value} value={value}>{value} {value === 1 ? 'day' : 'days'}</option>)}</select></label><div className="profile-setting"><span>⌁</span><div><strong>Timezone</strong><small>{user.timezone}</small></div></div><details className="install-help"><summary>Install Still on iPhone</summary><p>In Safari, tap the Share button, choose <strong>Add to Home Screen</strong>, then tap Add. Still will open like an app and keep your practice close.</p></details><button className="profile-action" onClick={() => void logout()}><span>↗</span><strong>Sign out</strong></button></div></section>
 }
