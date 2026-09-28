@@ -24,6 +24,16 @@ describe('achievementsFor', () => {
     ]
     expect(kinds(achievementsFor(history, 'a'))).not.toContain('2_day_streak')
     expect(achievementsFor(history, 'a').find((item) => item.kind === 'streak')?.label).toBe('1 day streak')
+    expect(achievementsFor(history, 'missing')).toEqual([])
+  })
+
+  it('orders equal timestamps by id so the prefix is deterministic', () => {
+    const history = [
+      session('z', '2026-01-01T10:00:00Z', '2026-01-01', 1),
+      session('a', '2026-01-01T10:00:00Z', '2026-01-01', 3600),
+    ]
+    expect(kinds(achievementsFor(history, 'a'))).toContain('first_sit')
+    expect(kinds(achievementsFor(history, 'z'))).not.toContain('first_sit')
   })
 
   it('uses stored local dates for timezone-safe streaks', () => {
@@ -73,10 +83,18 @@ describe('achievementsFor', () => {
     expect(kinds(achievementsFor(combined, 'c2'))).toContain('weekly_goal')
     expect(kinds(achievementsFor(combined, 'c2'))).not.toContain('days_goal')
     expect(kinds(achievementsFor(combined, 'c2'))).not.toContain('minutes_goal')
+    const combinedAlreadyMet = [...combined, session('c3', '2026-01-07T12:00:00Z', '2026-01-07', 60, { goalDays: 2, goalMinutes: 2 })]
+    expect(kinds(achievementsFor(combinedAlreadyMet, 'c3'))).not.toContain('weekly_goal')
 
     const legacy = [session('legacy', '2026-01-05T12:00:00Z', '2026-01-05', 60)]
     expect(kinds(achievementsFor(legacy, 'legacy'))).not.toContain('days_goal')
     expect(kinds(achievementsFor(legacy, 'legacy'))).not.toContain('minutes_goal')
     expect(kinds(achievementsFor(legacy, 'legacy'))).not.toContain('weekly_goal')
+    expect(kinds(achievementsFor([session('minute', '2026-01-05T12:00:00Z', '2026-01-05', 60, { goalDays: null, goalMinutes: 1 })], 'minute'))).toContain('minutes_goal')
+    const outOfOrderLocalDate = [
+      session('future-local', '2026-01-05T11:00:00Z', '2026-01-07', 60, { goalDays: 2, goalMinutes: null }),
+      session('target-local', '2026-01-05T12:00:00Z', '2026-01-05', 60, { goalDays: 2, goalMinutes: null }),
+    ]
+    expect(kinds(achievementsFor(outOfOrderLocalDate, 'target-local'))).not.toContain('days_goal')
   })
 })

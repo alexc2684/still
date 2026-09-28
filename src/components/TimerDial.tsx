@@ -30,7 +30,7 @@ export default function TimerDial({ durationMinutes, remainingSeconds, disabled 
     const previous = pointerRef.current?.angle
     if (previous !== undefined) { while (angle - previous > 180) angle -= 360; while (previous - angle > 180) angle += 360 }
     pointerRef.current = { id: event.pointerId, angle }
-    onDurationChange(clampMinutes(1 + (angle / 360) * 119))
+    onDurationChange!(clampMinutes(1 + (angle / 360) * 119))
   }
   const beginPointer = (event: React.PointerEvent) => {
     if (disabled || !onDurationChange || !dialRef.current) return
@@ -45,11 +45,10 @@ export default function TimerDial({ durationMinutes, remainingSeconds, disabled 
   const movePointer = (event: React.PointerEvent) => { if (pointerRef.current?.id === event.pointerId) setFromPointer(event) }
   const endPointer = (event: React.PointerEvent) => { if (pointerRef.current?.id === event.pointerId) pointerRef.current = null }
   const onKeyDown = (event: React.KeyboardEvent) => {
-    if (disabled || !onDurationChange) return
-    if (event.key === 'ArrowRight' || event.key === 'ArrowUp') { event.preventDefault(); onDurationChange(clampMinutes(durationMinutes + 1)) }
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') { event.preventDefault(); onDurationChange(clampMinutes(durationMinutes - 1)) }
-    if (event.key === 'Home') { event.preventDefault(); onDurationChange(1) }
-    if (event.key === 'End') { event.preventDefault(); onDurationChange(120) }
+    if (event.key === 'ArrowRight' || event.key === 'ArrowUp') { event.preventDefault(); onDurationChange!(clampMinutes(durationMinutes + 1)) }
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') { event.preventDefault(); onDurationChange!(clampMinutes(durationMinutes - 1)) }
+    if (event.key === 'Home') { event.preventDefault(); onDurationChange!(1) }
+    if (event.key === 'End') { event.preventDefault(); onDurationChange!(120) }
   }
   const angle = progress * 360
   const thumbX = 140 + RADIUS * Math.sin(angle * Math.PI / 180), thumbY = 140 - RADIUS * Math.cos(angle * Math.PI / 180)

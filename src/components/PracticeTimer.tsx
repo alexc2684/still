@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import './practice-timer.css'
 import { combineJournalNotes } from './journalNotes'
 import { playBowl, unlockBowlAudio } from '@/lib/bowl'
+import { storageGet, storageRemove, storageSet } from '@/lib/practice-storage'
 import TimerDial from './TimerDial'
 
 export type PracticeTimerUser = { id: string; name?: string; email?: string }
@@ -25,6 +26,8 @@ type ActivePractice = {
 }
 type Draft = { beforeMood: Mood | null; duringMood: Mood | null; afterMood: Mood | null; notes: string; beforeNote?: string; duringNote?: string; afterNote?: string }
 type Stored = ActivePractice & { completionPending?: boolean }
+export function resolvePracticeSessionId(activeId: string | null | undefined, completedId: string | null, persistedId: string | null) { return activeId || completedId || persistedId }
+export async function savePracticeReflection(sessionId: string | null, payload: Record<string, unknown>, onSaved?: () => void) { if (!sessionId) return null; const response = await fetch(`/api/sessions/${sessionId}/reflection`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); if (!response.ok) { const body = await response.json().catch(() => ({})) as { error?: string }; throw new Error(body.error || 'Could not save reflection.') } onSaved?.(); return response }
 const EMPTY_DRAFT: Draft = { beforeMood: null, duringMood: null, afterMood: null, notes: '' }
 const moodWords = ['restless', 'scattered', 'steady', 'open', 'clear']
 
@@ -54,7 +57,7 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
   const hydratedDraftKeyRef = useRef<string | null>(null)
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
 
-  const persist = useCallback((value: Stored | null) => { if (!storageKey) return; try { value ? localStorage.setItem(storageKey, JSON.stringify(value)) : localStorage.removeItem(storageKey) } catch { /* storage is optional */ } }, [storageKey])
+  const persist = useCallback((value: Stored | null) => { value ? storageSet(storageKey, JSON.stringify(value)) : storageRemove(storageKey) }, [storageKey])
   const setCurrent = useCallback((value: ActivePractice | null) => { activeRef.current = value; setActive(value) }, [])
   const acquireWakeLock = useCallback(async () => { if (!('wakeLock' in navigator) || document.visibilityState !== 'visible') return; try { wakeLockRef.current = await navigator.wakeLock.request('screen') } catch { /* unsupported or denied */ } }, [])
   const releaseWakeLock = useCallback(() => { void wakeLockRef.current?.release().catch(() => undefined); wakeLockRef.current = null }, [])
@@ -68,7 +71,7 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
       // A server clock can be just ahead of this device by one second.
       if (response.status === 422) { await new Promise(resolve => window.setTimeout(resolve, 1200)); response = await fetch(`/api/sessions/${session.sessionId}/complete`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }) }
       if (!response.ok) { const body = await jsonBody(response); throw new Error(body.error || 'Still could not save the completed session.') }
-      completedIdRef.current = session.sessionId; try { if (reflectionSessionKey) localStorage.setItem(reflectionSessionKey, session.sessionId) } catch { /* storage is optional */ }; persist(null); setCurrent(null); setRemaining(0); setSaved(true); setReflection(true); onSessionSaved?.(); releaseWakeLock()
+      completedIdRef.current = session.sessionId; storageSet(reflectionSessionKey, session.sessionId); persist(null); setCurrent(null); setRemaining(0); setSaved(true); setReflection(true); onSessionSaved?.(); releaseWakeLock()
     } catch (err) {
       completionFailedRef.current = true; persist({ ...session, completionPending: true }); setError(err instanceof Error ? err.message : 'Could not save your session.');
     } finally { completingRef.current = false; setBusy(false) }
@@ -77,7 +80,7 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
   useEffect(() => {
     if (!storageKey) { setCurrent(null); setSaved(false); setReflection(false); completedIdRef.current = null; return }
     try {
-      const raw = localStorage.getItem(storageKey)
+      const raw = storageGet(storageKey)
       if (!raw) return
       const item = JSON.parse(raw) as Stored
       if (!item.sessionId || !item.deadlineMs) return
@@ -87,12 +90,12 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
     } catch { /* malformed local state is ignored */ }
   }, [storageKey, completeNaturally, setCurrent])
 
-  useEffect(() => { hydratedDraftKeyRef.current = null; setDraft(EMPTY_DRAFT); if (!draftKey) return; try { const raw = localStorage.getItem(draftKey); const completedId = reflectionSessionKey ? localStorage.getItem(reflectionSessionKey) : null; if (raw) { const legacy = JSON.parse(raw) as Partial<Draft>; const notes = typeof legacy.notes === 'string' ? legacy.notes : combineJournalNotes(legacy); setDraft({ beforeMood: legacy.beforeMood ?? null, duringMood: legacy.duringMood ?? null, afterMood: legacy.afterMood ?? null, notes }) } if (completedId) { completedIdRef.current = completedId; setSaved(true); setRemaining(0); setReflection(true) } } catch { /* optional */ } hydratedDraftKeyRef.current = draftKey }, [draftKey, reflectionSessionKey])
-  useEffect(() => { if (!draftKey || hydratedDraftKeyRef.current !== draftKey) return; try { localStorage.setItem(draftKey, JSON.stringify(draft)) } catch { /* optional */ } }, [draft, draftKey])
+  useEffect(() => { hydratedDraftKeyRef.current = null; setDraft(EMPTY_DRAFT); if (!draftKey) return; try { const raw = storageGet(draftKey); const completedId = storageGet(reflectionSessionKey); if (raw) { const legacy = JSON.parse(raw) as Partial<Draft>; const notes = typeof legacy.notes === 'string' ? legacy.notes : combineJournalNotes(legacy); setDraft({ beforeMood: legacy.beforeMood ?? null, duringMood: legacy.duringMood ?? null, afterMood: legacy.afterMood ?? null, notes }) } if (completedId) { completedIdRef.current = completedId; setSaved(true); setRemaining(0); setReflection(true) } } catch { /* optional */ } hydratedDraftKeyRef.current = draftKey }, [draftKey, reflectionSessionKey])
+  useEffect(() => { if (hydratedDraftKeyRef.current !== draftKey) return; storageSet(draftKey, JSON.stringify(draft)) }, [draft, draftKey])
   useEffect(() => {
     if (!active) { releaseWakeLock(); return }
     void acquireWakeLock()
-    const tick = () => { const next = Math.max(0, Math.ceil((active.deadlineMs - Date.now()) / 1000)); setRemaining(next); if (next <= 0 && !cancelingRef.current) { if (!bellPlayedRef.current) { bellPlayedRef.current = true; playBowl() } if (!completionFailedRef.current) void completeNaturally(active) } }
+    const tick = () => { const next = Math.max(0, Math.ceil((active.deadlineMs - Date.now()) / 1000)); setRemaining(next); if (next <= 0 && !cancelingRef.current && activeRef.current?.sessionId === active.sessionId) { if (!bellPlayedRef.current) { bellPlayedRef.current = true; playBowl() } if (!completionFailedRef.current) void completeNaturally(active) } }
     tick(); const id = window.setInterval(tick, 250)
     const visibility = () => { if (document.visibilityState === 'visible') void acquireWakeLock() }
     document.addEventListener('visibilitychange', visibility)
@@ -107,7 +110,6 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
   }, [])
 
   async function begin() {
-    if (disabled) return
     if (!user) { onSignIn?.(); return }
     unlockBowlAudio(); completionFailedRef.current = false; bellPlayedRef.current = false; cancelingRef.current = false; setBusy(true); setError('')
     try {
@@ -122,24 +124,22 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not begin your practice.') } finally { setBusy(false) }
   }
   async function cancel() {
-    if (!active || busy) return
     cancelingRef.current = true; setBusy(true); setError('')
-    try { const response = await fetch(`/api/sessions/${active.sessionId}`, { method: 'DELETE' }); if (!response.ok) { const body = await jsonBody(response); throw new Error(body.error || 'Could not end this practice.') }; persist(null); setCurrent(null); setRemaining(minutes * 60); releaseWakeLock() } catch (err) { cancelingRef.current = false; setError(err instanceof Error ? err.message : 'Could not end this practice.') } finally { setBusy(false) }
+    try { const response = await fetch(`/api/sessions/${active!.sessionId}`, { method: 'DELETE' }); if (!response.ok) { const body = await jsonBody(response); throw new Error(body.error || 'Could not end this practice.') }; persist(null); setCurrent(null); setRemaining(minutes * 60); releaseWakeLock() } catch (err) { cancelingRef.current = false; setError(err instanceof Error ? err.message : 'Could not end this practice.') } finally { setBusy(false) }
   }
   async function saveReflection() {
     const sessionId = activeRef.current?.sessionId
     // completed session id is retained separately so reflection can be saved after completion.
     let persistedId: string | null = null
-    try { persistedId = reflectionSessionKey ? localStorage.getItem(reflectionSessionKey) : null } catch { /* storage is optional */ }
-    const id = sessionId || completedIdRef.current || persistedId
-    if (!id) return
+    persistedId = storageGet(reflectionSessionKey)
+    const id = resolvePracticeSessionId(sessionId, completedIdRef.current, persistedId)
     setReflectionBusy(true); setReflectionError('')
-    try { const response = await fetch(`/api/sessions/${id}/reflection`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ beforeMood: draft.beforeMood ?? undefined, duringMood: draft.duringMood ?? undefined, afterMood: draft.afterMood ?? undefined, beforeNote: null, duringNote: null, afterNote: draft.notes }) }); const body = await jsonBody(response); if (!response.ok) throw new Error(body.error || 'Could not save reflection.'); try { if (draftKey) localStorage.removeItem(draftKey); if (reflectionSessionKey) localStorage.removeItem(reflectionSessionKey) } catch { /* storage is optional */ }; hydratedDraftKeyRef.current = null; setReflection(false); setReflectionError('') } catch (err) { setReflectionError(err instanceof Error ? err.message : 'Could not save reflection.') } finally { setReflectionBusy(false) }
+    try { await savePracticeReflection(id, { beforeMood: draft.beforeMood ?? undefined, duringMood: draft.duringMood ?? undefined, afterMood: draft.afterMood ?? undefined, beforeNote: null, duringNote: null, afterNote: draft.notes }, () => { storageRemove(draftKey); storageRemove(reflectionSessionKey); hydratedDraftKeyRef.current = null; setReflection(false); setReflectionError('') }) } catch (err) { setReflectionError(err instanceof Error ? err.message : 'Could not save reflection.') } finally { setReflectionBusy(false) }
   }
   function beginNewSession() {
     completedIdRef.current = null; setSaved(false); setReflection(false); setReflectionError(''); setDraft(EMPTY_DRAFT); setRemaining(minutes * 60)
     hydratedDraftKeyRef.current = null
-    try { if (draftKey) localStorage.removeItem(draftKey); if (reflectionSessionKey) localStorage.removeItem(reflectionSessionKey) } catch { /* storage is optional */ }
+    storageRemove(draftKey); storageRemove(reflectionSessionKey)
   }
   const displayRemaining = active ? remaining : saved ? 0 : minutes * 60
   const setMood = (key: 'beforeMood' | 'duringMood' | 'afterMood', value: Mood) => setDraft(current => ({ ...current, [key]: value }))

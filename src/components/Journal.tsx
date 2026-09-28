@@ -87,7 +87,7 @@ export default function Journal({ signedIn = true, onSignIn, onChanged, refreshK
   }
   useEffect(() => { if (signedIn) void load(); else setLoading(false) }, [signedIn, refreshKey])
 
-  const completedSessions = useMemo(() => sessions.filter(session => Boolean(session.completedAt)), [sessions])
+  const completedSessions = useMemo(() => sessions.filter((session): session is JournalSession & { completedAt: string } => Boolean(session.completedAt)), [sessions])
   const totalMinutes = useMemo(() => Math.round(completedSessions.reduce((sum, session) => sum + (session.elapsedSeconds || session.plannedSeconds), 0) / 60), [completedSessions])
   const today = useMemo(() => new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date()), [timezone])
   const monthTitle = month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
@@ -133,10 +133,10 @@ export default function Journal({ signedIn = true, onSignIn, onChanged, refreshK
   </section>
 }
 
-function JournalEntry({ session, editing, saving, onEdit, onCancel, onSave, onDelete }: { session: JournalSession; editing: boolean; saving: boolean; onEdit: () => void; onCancel: () => void; onSave: (notes: Pick<JournalSession, 'beforeMood' | 'duringMood' | 'afterMood'> & { notes: string }) => void; onDelete: () => void }) {
+function JournalEntry({ session, editing, saving, onEdit, onCancel, onSave, onDelete }: { session: JournalSession & { completedAt: string }; editing: boolean; saving: boolean; onEdit: () => void; onCancel: () => void; onSave: (notes: Pick<JournalSession, 'beforeMood' | 'duringMood' | 'afterMood'> & { notes: string }) => void; onDelete: () => void }) {
   const [notes, setNotes] = useState(combineJournalNotes(session))
   const [moods, setMoods] = useState<{ beforeMood: Mood | null; duringMood: Mood | null; afterMood: Mood | null }>({ beforeMood: session.beforeMood ?? null, duringMood: session.duringMood ?? null, afterMood: session.afterMood ?? null })
   useEffect(() => { if (editing) { setNotes(combineJournalNotes(session)); setMoods({ beforeMood: session.beforeMood ?? null, duringMood: session.duringMood ?? null, afterMood: session.afterMood ?? null }) } }, [editing, session])
-  const date = session.completedAt ?? session.startedAt
+  const date = session.completedAt
   return <article className="post journal-entry"><div className="post-head"><span className="session-glyph">◌</span><div><strong>{new Date(date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</strong><span>{formatMinutes(session.elapsedSeconds || session.plannedSeconds)} minutes</span></div><button className="more" onClick={onDelete} aria-label="Delete session and reflection">Delete</button></div>{editing ? <div className="reflection-form"><div className="mood-row">{(['before', 'during', 'after'] as const).map(stage => <div className="reflection-stage" key={stage}><span className="eyebrow">{stage}</span><div className="mood-picker" role="group" aria-label={`${stage} mood`}>{[1, 2, 3, 4, 5].map(value => <button type="button" key={value} className={moods[`${stage}Mood`] === value ? 'selected' : ''} onClick={() => setMoods(current => ({ ...current, [`${stage}Mood`]: value as Mood }))} aria-label={`${value} of 5`}>{value}</button>)}</div></div>)}</div><label className="notes-field"><span className="eyebrow">Notes</span><textarea maxLength={6500} value={notes} onChange={event => setNotes(event.target.value)} placeholder="What did you notice?" /></label><div><button className="primary-button" disabled={saving} onClick={() => onSave({ ...moods, notes })}>{saving ? 'Saving…' : 'Save reflection'}</button><button className="text-button" onClick={onCancel}>Cancel</button></div></div> : <><div className="reflection-moods">{(['before', 'during', 'after'] as const).map(stage => { const mood = session[`${stage}Mood`]; return <span key={stage}><b>{stage}</b>{mood ? `${mood}/5 · ${moodLabels[mood - 1]}` : 'No mood recorded'}</span> })}</div><p className="reflection-notes-block">{combineJournalNotes(session) || 'No notes yet.'}</p><button className="link-button" onClick={onEdit}>{session.afterNote || session.duringNote || session.beforeNote ? 'Edit reflection' : 'Add reflection'} <span>→</span></button></>}</article>
 }
