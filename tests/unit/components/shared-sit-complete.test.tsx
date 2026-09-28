@@ -27,6 +27,10 @@ describe('SharedSit complete behavior', () => {
     Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request: vi.fn().mockResolvedValue({ release: vi.fn().mockResolvedValue(undefined) }) } })
     vi.spyOn(window.history, 'replaceState'); playBowl.mockReset(); unlockBowlAudio.mockReset()
   })
+  it('keeps planned seconds in seconds for waiting and scheduled-running dials', async () => {
+    fetchMock.mockResolvedValueOnce(response({ room: room({ plannedSeconds: 600 }) })); render(<SharedSit user={host} onSignIn={vi.fn()} initialToken="abc" />); await waitFor(() => expect(screen.getByTestId('dial')).toHaveTextContent('minutes:600')); cleanup()
+    const now = Date.now(); fetchMock.mockResolvedValueOnce(response({ room: room({ plannedSeconds: 600, status: 'running', startedAt: new Date(now + 3000).toISOString(), endsAt: new Date(now + 603000).toISOString() }) })); render(<SharedSit user={host} onSignIn={vi.fn()} initialToken="abc" />); await waitFor(() => expect(screen.getByTestId('dial')).toHaveTextContent(/Starting in/)); expect(screen.getByTestId('dial')).not.toHaveTextContent('36000')
+  })
   afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
   it('covers signed-out, disabled, URL token and sign-in paths', async () => {
