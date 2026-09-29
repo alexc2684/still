@@ -1,0 +1,8 @@
+.circle-member-count { display: block; background: transparent; padding: 0; text-align: left; text-decoration: underline; text-underline-offset: 4px; }
+.circle-members { margin: 12px 0 24px; text-align: left; }
+.circle-members ul { list-style: none; padding: 0; margin: 0; max-height: 320px; overflow-y: auto; }
+.circle-members li > div, .circle-members li > button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); font-size: 13px; text-align: left; }
+.circle-members button:disabled { opacity: .5; }
+.member-add-label { margin-left: auto; color: var(--sage-dark); }
+.add-sit-participant { width: 100%; margin: 18px 0; }
+.add-sit-participant > p, .add-sit-participant > div > p { font-size: 12px; line-height: 1.5; color: var(--muted); }

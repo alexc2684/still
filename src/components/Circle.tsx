@@ -4,16 +4,19 @@ import { useCallback, useEffect, useState } from 'react';
 import { Clock3, Flame, Heart, MessageCircle, Send, Sparkles, Target, Trash2, Trophy } from 'lucide-react';
 import './circle.css';
 import Avatar from './Avatar';
+import CircleMembers from './CircleMembers';
+import AddSitParticipant from './AddSitParticipant';
 
 type Achievement = { kind: string; label: string };
 type Participant = { userId: string; name: string; avatarKey?: string | null; achievements?: Achievement[] };
-type Post = { id: string; userId: string; authorName: string; authorAvatarKey?: string | null; completedAt: string; elapsedSeconds: number; sessionName?: string | null; sharedSitId?: string | null; participants?: Participant[]; participantCount?: number; achievements?: Achievement[]; kudos: number; comments: number; viewerHasKudosed: boolean };
+type Post = { canAddParticipants?: boolean; id: string; userId: string; authorName: string; authorAvatarKey?: string | null; completedAt: string; elapsedSeconds: number; sessionName?: string | null; sharedSitId?: string | null; participants?: Participant[]; participantCount?: number; achievements?: Achievement[]; kudos: number; comments: number; viewerHasKudosed: boolean };
 type Comment = { id: string; userId: string; name: string; avatarKey?: string | null; body: string; createdAt: string };
 type Props = { signedIn: boolean; onSignIn: () => void; userId?: string };
 
 const relativeTime = (value: string) => { const minutes = Math.max(1, Math.round((Date.now() - new Date(value).getTime()) / 60000)); return minutes < 60 ? `${minutes}m ago` : minutes < 1440 ? `${Math.round(minutes / 60)}h ago` : `${Math.round(minutes / 1440)}d ago`; };
 
 export default function Circle({ signedIn, onSignIn, userId }: Props) {
+  const [membersOpen, setMembersOpen] = useState(false);
   const [memberCount, setMemberCount] = useState<number | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
@@ -44,13 +47,15 @@ export default function Circle({ signedIn, onSignIn, userId }: Props) {
   return <div className="content-view circle-view">
     <div className="view-header"><div><h1>Circle</h1></div><button className="round-button" onClick={() => void load()} aria-label="Refresh feed">↻</button></div>
     {error && <div className="circle-error" role="alert">{error} <button className="text-button" onClick={() => void load()}>Retry</button></div>}
-    {memberCount !== null && <p className="circle-member-count">{memberCount.toLocaleString()} {memberCount === 1 ? 'person' : 'people'} in the circle.</p>}
+    {memberCount !== null && <button className="circle-member-count" aria-expanded={membersOpen} aria-controls="circle-members" onClick={() => setMembersOpen(value => !value)}>{memberCount.toLocaleString()} {memberCount === 1 ? 'person' : 'people'} in your circle</button>}
+    {membersOpen && <div id="circle-members"><CircleMembers /></div>}
     <div className="feed-tabs"><button className="selected">Everyone</button></div>
     {!posts.length ? <div className="feed-empty"><div className="empty-mark">◌</div><h2>Your circle is quiet</h2><p>Complete a session to start the conversation.</p></div> : posts.map((post) => <article className="post circle-post" key={post.id}>
       <div className="post-head"><Avatar name={post.authorName} avatarKey={post.authorAvatarKey} size="medium" /><div><strong>{post.sharedSitId ? 'A shared sit' : post.authorName}</strong><span>{relativeTime(post.completedAt)}</span></div></div>
       <div className="post-session"><span className="session-glyph">◌</span><div><strong>{post.sessionName || (post.sharedSitId ? 'Sat together' : 'Meditation')}</strong><span>{Math.round(post.elapsedSeconds / 60)} {Math.round(post.elapsedSeconds / 60) === 1 ? 'minute' : 'minutes'} {post.sharedSitId ? 'sat together' : 'of stillness'}</span></div></div>
       {post.sharedSitId && <div className="shared-participants" aria-label={`${post.participantCount || post.participants?.length || 0} participants`}><div className="participant-avatars">{(post.participants || []).map((participant) => <Avatar key={participant.userId} name={participant.name} avatarKey={participant.avatarKey} size="small" />)}</div><span>{(post.participants || []).map((participant) => participant.name).join(', ')}</span></div>}
       {(() => { const shared = Boolean(post.participants?.length); const achievements = shared ? post.participants!.flatMap((participant) => (participant.achievements || []).map((achievement) => ({ ...achievement, participant }))) : (post.achievements || []).map((achievement) => ({ ...achievement, participant: null })); return achievements.length ? <div className="achievement-row" aria-label="Achievements">{achievements.map(({ participant, kind, label }) => { const normalizedKind = kind.toLowerCase(); const category = normalizedKind.includes('goal') ? 'goal' : kind.includes('hour') || kind.includes('minute') ? 'milestone' : kind.includes('streak') ? 'streak' : 'practice'; const Icon = category === 'streak' ? Flame : category === 'goal' ? Target : category === 'milestone' ? Clock3 : normalizedKind.includes('first') ? Sparkles : Trophy; return <span className={`achievement-chip achievement-${category}`} key={`${participant?.userId || post.userId}-${kind}-${label}`}><Icon size={14} aria-hidden="true" /> <span>{participant ? `${participant.name} · ` : ''}{label}</span></span> })}</div> : null })()}
+      {post.sharedSitId && post.canAddParticipants && <AddSitParticipant sitKey={post.sharedSitId} memberIds={(post.participants || []).map(member => member.userId)} onAdded={load} />}
       <div className="circle-actions"><button className={post.viewerHasKudosed ? 'is-active' : ''} disabled={pending[post.id]} aria-label={post.viewerHasKudosed ? 'Remove kudos' : 'Give kudos'} aria-pressed={post.viewerHasKudosed} onClick={() => void toggleKudos(post)}><Heart size={18} fill={post.viewerHasKudosed ? 'currentColor' : 'none'} /> <span>Kudos</span><b>{post.kudos}</b></button><button aria-label={`${post.comments} comments`} aria-expanded={!!open[post.id]} onClick={() => void showComments(post.id)}><MessageCircle size={18} /><span>Comment</span><b>{post.comments}</b></button></div>
       {open[post.id] && <div className="circle-comments"><div className="comment-list">{(comments[post.id] || []).map((comment) => <div className="circle-comment" key={comment.id}><Avatar name={comment.name} avatarKey={comment.avatarKey} size="small" /><div className="comment-content"><div className="comment-meta"><strong>{comment.name}</strong><span>{relativeTime(comment.createdAt)}</span>{userId === comment.userId && <button className="comment-delete" disabled={pending[comment.id]} aria-label="Delete comment" onClick={() => void deleteComment(post, comment)}><Trash2 size={12} /></button>}</div><p>{comment.body}</p></div></div>)}</div>{commentError[post.id] && <div className="form-error" role="alert">{commentError[post.id]}</div>}<div className="comment-form"><input aria-label="Comment" maxLength={500} value={text[post.id] || ''} onChange={(event) => setText((state) => ({ ...state, [post.id]: event.target.value }))} placeholder="Leave a comment…" /><button disabled={pending[post.id] || !(text[post.id] || '').trim()} onClick={() => void addComment(post)} aria-label="Post comment"><Send size={16} /> <span>Post</span></button></div></div>}
     </article>)}</div>;

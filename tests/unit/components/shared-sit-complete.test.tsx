@@ -83,7 +83,7 @@ describe('SharedSit complete behavior', () => {
 
   it('runs host countdown, wake lock lifecycle, completion retry and reflection acknowledgement', async () => {
     const now = Date.now(); const running = room({ status: 'running', startedAt: new Date(now - 5000).toISOString(), endsAt: new Date(now - 1000).toISOString(), ownSessionId: 's1' }); fetchMock.mockResolvedValueOnce(response({ room: running })).mockResolvedValueOnce(response({ error: 'complete nope' }, false)).mockResolvedValueOnce(response({})).mockResolvedValueOnce(response({ room: { ...running, status: 'completed' } })); render(<SharedSit user={host} onSignIn={vi.fn()} initialToken="abc" />)
-    await waitFor(() => expect(screen.getByRole('button', { name: /retry completion/i })).toBeInTheDocument()); expect(playBowl).toHaveBeenCalled(); const request = (navigator.wakeLock.request as any); expect(request).toHaveBeenCalledWith('screen'); fireEvent(document, new Event('visibilitychange')); expect(request).toHaveBeenCalled()
+    await waitFor(() => expect(screen.getByRole('button', { name: /retry completion/i })).toBeInTheDocument()); expect(playBowl).not.toHaveBeenCalled(); const request = (navigator.wakeLock.request as any); expect(request).toHaveBeenCalledWith('screen'); fireEvent(document, new Event('visibilitychange')); expect(request).toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: /retry completion/i })); await userEvent.click(await screen.findByRole('button', { name: /skip/i })); await waitFor(() => expect(screen.getByText(/sit is complete/i)).toBeInTheDocument()); await userEvent.click(screen.getByRole('button', { name: /edit reflection/i })); await userEvent.click(screen.getByRole('button', { name: /skip/i })); expect(localStorage.getItem('still:shared-reflection-ack:host:s1')).toBe('1')
   })
 
@@ -198,4 +198,30 @@ describe('SharedSit complete behavior', () => {
   it('opens reflection when acknowledgement storage is unavailable', async () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('storage unavailable') }); fetchMock.mockResolvedValueOnce(response({ room: room({ status: 'completed', ownSessionId: 'storage-fallback' }) })); render(<SharedSit user={guest} onSignIn={vi.fn()} initialToken="abc" />); await waitFor(() => expect(screen.getByRole('button', { name: /save reflection/i })).toBeInTheDocument())
   })
+})
+
+it('does not play a late start bell with one minute left, survives wall-clock jumps, and rings only after completion', async () => {
+  vi.useFakeTimers(); localStorage.clear(); playBowl.mockReset()
+  const base = Date.now(), mono = performance.now()
+  let completed = false
+  let finish!: () => void
+  const completion = new Promise<void>(resolve => { finish = resolve })
+  const running = room({ status: 'running', plannedSeconds: 600, startedAt: new Date(base - 540000).toISOString(), endsAt: new Date(base + 60000).toISOString(), ownSessionId: 'end-bell' })
+  fetchMock.mockImplementation(async (url: string) => {
+    if (url.endsWith('/complete')) { await completion; completed = true; return response({}) }
+    return response({ room: { ...running, status: completed ? 'completed' : 'running', serverNow: new Date(base + performance.now() - mono).toISOString() } })
+  }); vi.stubGlobal('fetch', fetchMock)
+  render(<SharedSit user={host} onSignIn={vi.fn()} initialToken="abc" />)
+  await act(async () => {})
+  expect(screen.getByTestId('dial')).toHaveTextContent('remaining:60'); expect(playBowl).not.toHaveBeenCalled()
+  vi.setSystemTime(base + 3600000)
+  await act(async () => { await vi.advanceTimersByTimeAsync(59000) })
+  expect(screen.getByTestId('dial')).toHaveTextContent('remaining:1'); expect(playBowl).not.toHaveBeenCalled()
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+  expect(playBowl).not.toHaveBeenCalled()
+  await act(async () => { finish() })
+  expect(playBowl).toHaveBeenCalledTimes(1)
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+  expect(playBowl).toHaveBeenCalledTimes(1)
+  cleanup(); vi.useRealTimers(); vi.unstubAllGlobals()
 })

@@ -42,7 +42,7 @@ try {
   assert.equal(await page.getByRole('button', { name: yesterday, exact: true }).getAttribute('aria-pressed'), 'true')
   await page.screenshot({ path: '/private/tmp/still-journal-selected.png', fullPage: true })
   await page.getByRole('button', { name: /Circle/ }).click()
-  await page.getByText('1,234 people in the circle.').waitFor()
+  await page.getByText('1,234 people in your circle').waitFor()
   await page.screenshot({ path: '/private/tmp/still-circle-count.png', fullPage: true })
 
   const auth = await browser.newPage({ viewport: { width: 393, height: 852 } })

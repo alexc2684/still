@@ -67,3 +67,19 @@ describe('rate limiting', () => {
     await expect(authRateLimit('new-key')).resolves.toBe(true)
   })
 })
+
+it('runs attendance writes serializably and returns the query rows', async () => {
+  vi.resetModules()
+  vi.doUnmock('../../../src/lib/db')
+  const query = vi.fn(() => 'query-promise'), transaction = vi.fn(async () => [[{ userId: 'member' }]])
+  vi.doMock('@neondatabase/serverless', () => ({ neon: vi.fn(() => ({ query, transaction })) }))
+  vi.stubEnv('DATABASE_URL', 'https://db.example')
+  try {
+    const { sql } = await import('../../../src/lib/db')
+    await expect(sql('Serializable')('INSERT fixture', ['member'])).resolves.toEqual([{ userId: 'member' }])
+    expect(query).toHaveBeenCalledWith('INSERT fixture', ['member'])
+    expect(transaction).toHaveBeenCalledWith(['query-promise'], { isolationLevel: 'Serializable' })
+    await sql('Serializable')('SELECT 1')
+    expect(query).toHaveBeenLastCalledWith('SELECT 1', [])
+  } finally { vi.unstubAllEnvs() }
+})

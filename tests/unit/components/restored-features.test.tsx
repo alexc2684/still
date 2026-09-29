@@ -55,7 +55,7 @@ it('retries failed journal loads and ignores stale responses after selection or 
 it.each([0, 1, 24])('shows %s registered users independently of feed activity', async count => {
   vi.stubGlobal('fetch', vi.fn(async () => response({ feed: [], memberCount: count })))
   render(<Circle signedIn onSignIn={vi.fn()} />)
-  await screen.findByText(`${count} ${count === 1 ? 'person' : 'people'} in the circle.`)
+  await screen.findByText(`${count} ${count === 1 ? 'person' : 'people'} in your circle`)
 })
 it('offers forgot password, displays generic confirmation, and returns to sign in', async () => {
   const fetcher = vi.fn().mockResolvedValueOnce(response({ message: 'Check your email.' })).mockResolvedValueOnce(response({})).mockResolvedValueOnce(response({ error: 'Temporarily unavailable' }, 503))
