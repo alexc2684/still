@@ -22,9 +22,9 @@ export default function TimerDial({ durationMinutes, remainingSeconds, disabled 
   const pointerRef = useRef<{ id: number; angle: number; exactMinutes: number } | null>(null)
   const inputId = useId()
   const total = durationMinutes * 60
-  const elapsedSeconds = running ? Math.max(0, total - remainingSeconds) : durationMinutes * 60
-  const firstProgress = Math.min(1, elapsedSeconds / 3600)
-  const secondProgress = Math.max(0, Math.min(1, (elapsedSeconds - 3600) / 3600))
+  const selectedSeconds = durationMinutes * 60
+  const firstProgress = running ? Math.max(0, Math.min(1, remainingSeconds / total)) : Math.min(1, selectedSeconds / 3600)
+  const secondProgress = running ? 0 : Math.max(0, Math.min(1, (selectedSeconds - 3600) / 3600))
   const setFromPointer = (event: React.PointerEvent) => {
     if (!dialRef.current || disabled || !onDurationChange) return
     const bounds = dialRef.current.getBoundingClientRect(), x = event.clientX - (bounds.left + bounds.width / 2), y = event.clientY - (bounds.top + bounds.height / 2)
@@ -64,7 +64,7 @@ export default function TimerDial({ durationMinutes, remainingSeconds, disabled 
   const thumbX = 140 + RADIUS * Math.sin(angle * Math.PI / 180), thumbY = 140 - RADIUS * Math.cos(angle * Math.PI / 180)
   const interactive = Boolean(onDurationChange) && !disabled
   return <div className={`timer-dial ${interactive ? 'is-interactive' : ''}`} ref={dialRef} onPointerDown={beginPointer} onPointerMove={movePointer} onPointerUp={endPointer} onPointerCancel={endPointer}>
-    <svg viewBox="0 0 280 280" aria-hidden="true"><circle className="timer-dial-track" cx="140" cy="140" r={RADIUS} /><circle className="timer-dial-progress" cx="140" cy="140" r={RADIUS} strokeDasharray={CIRCUMFERENCE} strokeDashoffset={CIRCUMFERENCE * (1 - firstProgress)} />{(durationMinutes > 60 || secondProgress > 0) && <circle className="timer-dial-progress timer-dial-progress-second" cx="140" cy="140" r="116" strokeDasharray={2 * Math.PI * 116} strokeDashoffset={2 * Math.PI * 116 * (1 - secondProgress)} />}{onDurationChange && <circle className="timer-dial-thumb" cx={thumbX} cy={thumbY} r="7" />}</svg>
+    <svg viewBox="0 0 280 280" aria-hidden="true"><circle className="timer-dial-track" cx="140" cy="140" r={RADIUS} /><circle key={running ? 'countdown' : 'duration'} className="timer-dial-progress" cx="140" cy="140" r={RADIUS} strokeDasharray={CIRCUMFERENCE} strokeDashoffset={CIRCUMFERENCE * (1 - firstProgress)} />{!running && durationMinutes > 60 && <circle className="timer-dial-progress timer-dial-progress-second" cx="140" cy="140" r="116" strokeDasharray={2 * Math.PI * 116} strokeDashoffset={2 * Math.PI * 116 * (1 - secondProgress)} />}{onDurationChange && <circle className="timer-dial-thumb" cx={thumbX} cy={thumbY} r="7" />}</svg>
     <div className="timer-dial-center"><strong>{formatTime(remainingSeconds)}</strong><span>{phaseLabel || (remainingSeconds === 0 ? 'well done' : 'remaining')}</span>{interactive && durationMinutes > 60 && <small>second revolution</small>}</div>
     {onDurationChange && <div className="timer-dial-duration"><label htmlFor={inputId}>Duration</label><input id={inputId} type="number" min="1" max="120" step="1" value={durationMinutes} disabled={disabled} onChange={event => onDurationChange(clampMinutes(Number(event.target.value) || 1))} onPointerDown={event => event.stopPropagation()} /></div>}
     {interactive && <div className="timer-dial-slider" role="slider" tabIndex={0} aria-label="Duration in minutes" aria-valuemin={1} aria-valuemax={120} aria-valuenow={durationMinutes} aria-valuetext={`${durationMinutes} minutes`} onKeyDown={onKeyDown} />}

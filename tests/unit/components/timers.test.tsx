@@ -27,6 +27,22 @@ describe('PracticeTimer session resolution', () => {
 })
 
 describe('TimerDial', () => {
+  it('uses a full-session countdown ring while preserving duration-picker revolutions', () => {
+    const circumference = 2 * Math.PI * 126
+    const progressOffset = () => Number(document.querySelector('.timer-dial-progress')!.getAttribute('stroke-dashoffset'))
+    const view = render(<TimerDial durationMinutes={10} remainingSeconds={600} onDurationChange={vi.fn()} />)
+    expect(progressOffset()).toBeCloseTo(circumference * (5 / 6))
+    view.rerender(<TimerDial durationMinutes={10} remainingSeconds={600} running disabled />)
+    expect(progressOffset()).toBeCloseTo(0)
+    view.rerender(<TimerDial durationMinutes={10} remainingSeconds={300} running disabled phaseLabel="paused" />)
+    expect(progressOffset()).toBeCloseTo(circumference / 2)
+    view.rerender(<TimerDial durationMinutes={10} remainingSeconds={12} running disabled />)
+    expect(progressOffset()).toBeCloseTo(circumference * .98)
+    view.rerender(<TimerDial durationMinutes={10} remainingSeconds={0} running disabled />)
+    expect(progressOffset()).toBeCloseTo(circumference)
+    view.rerender(<TimerDial durationMinutes={120} remainingSeconds={7200} onDurationChange={vi.fn()} />)
+    expect(document.querySelector('.timer-dial-progress-second')).not.toBeNull()
+  })
   it('formats time, clamps number input, handles keyboard bounds, and renders progress states', async () => {
     const change = vi.fn()
     const { rerender } = render(<TimerDial durationMinutes={10} remainingSeconds={65} onDurationChange={change} phaseLabel="minutes" />)
