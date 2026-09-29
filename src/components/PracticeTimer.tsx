@@ -23,6 +23,8 @@ type ActivePractice = {
   startedAt: string
   deadlineMs: number
   plannedSeconds: number
+  paused?: boolean
+  pausedRemainingSeconds?: number
 }
 type Draft = { beforeMood: Mood | null; duringMood: Mood | null; afterMood: Mood | null; notes: string; beforeNote?: string; duringNote?: string; afterNote?: string }
 type Stored = ActivePractice & { completionPending?: boolean }
@@ -84,16 +86,18 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
       if (!raw) return
       const item = JSON.parse(raw) as Stored
       if (!item.sessionId || !item.deadlineMs) return
-      const restored = { sessionId: item.sessionId, startedAt: item.startedAt, deadlineMs: item.deadlineMs, plannedSeconds: item.plannedSeconds }
+      const validPaused = item.paused === true && Number.isFinite(item.pausedRemainingSeconds) && item.pausedRemainingSeconds! > 0 && item.pausedRemainingSeconds! <= item.plannedSeconds
+      const restored = { sessionId: item.sessionId, startedAt: item.startedAt, deadlineMs: item.deadlineMs, plannedSeconds: item.plannedSeconds, paused: validPaused, pausedRemainingSeconds: validPaused ? item.pausedRemainingSeconds : undefined }
       setMinutes(Math.max(1, Math.min(120, Math.round(restored.plannedSeconds / 60)))); setCurrent(restored)
-      if (item.completionPending || item.deadlineMs <= Date.now()) void completeNaturally(restored)
+      if (validPaused) setRemaining(item.pausedRemainingSeconds!)
+      else if (item.completionPending || item.deadlineMs <= Date.now()) void completeNaturally(restored)
     } catch { /* malformed local state is ignored */ }
   }, [storageKey, completeNaturally, setCurrent])
 
   useEffect(() => { hydratedDraftKeyRef.current = null; setDraft(EMPTY_DRAFT); if (!draftKey) return; try { const raw = storageGet(draftKey); const completedId = storageGet(reflectionSessionKey); if (raw) { const legacy = JSON.parse(raw) as Partial<Draft>; const notes = typeof legacy.notes === 'string' ? legacy.notes : combineJournalNotes(legacy); setDraft({ beforeMood: legacy.beforeMood ?? null, duringMood: legacy.duringMood ?? null, afterMood: legacy.afterMood ?? null, notes }) } if (completedId) { completedIdRef.current = completedId; setSaved(true); setRemaining(0); setReflection(true) } } catch { /* optional */ } hydratedDraftKeyRef.current = draftKey }, [draftKey, reflectionSessionKey])
   useEffect(() => { if (hydratedDraftKeyRef.current !== draftKey) return; storageSet(draftKey, JSON.stringify(draft)) }, [draft, draftKey])
   useEffect(() => {
-    if (!active) { releaseWakeLock(); return }
+    if (!active || active.paused) { releaseWakeLock(); return }
     void acquireWakeLock()
     const tick = () => { const next = Math.max(0, Math.ceil((active.deadlineMs - Date.now()) / 1000)); setRemaining(next); if (next <= 0 && !cancelingRef.current && activeRef.current?.sessionId === active.sessionId) { if (!bellPlayedRef.current) { bellPlayedRef.current = true; playBowl() } if (!completionFailedRef.current) void completeNaturally(active) } }
     tick(); const id = window.setInterval(tick, 250)
@@ -121,7 +125,22 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
       if (!startedAt) throw new Error('The server did not return a start time.')
       const next = { sessionId: body.session.id, startedAt, deadlineMs: new Date(startedAt).getTime() + Math.round(plannedSeconds) * 1000, plannedSeconds: Math.round(plannedSeconds) }
       persist(next); setSaved(false); setCurrent(next); setRemaining(plannedSeconds)
+      playBowl(true)
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not begin your practice.') } finally { setBusy(false) }
+  }
+  function pause() {
+    const running = active!
+    const pausedRemainingSeconds = Math.max(0, Math.ceil((running.deadlineMs - Date.now()) / 1000))
+    if (pausedRemainingSeconds <= 0) return
+    const next = { ...running, paused: true, pausedRemainingSeconds }
+    persist(next); setCurrent(next); setRemaining(pausedRemainingSeconds); releaseWakeLock()
+  }
+  function resume() {
+    const paused = active!
+    unlockBowlAudio()
+    const seconds = paused.pausedRemainingSeconds!
+    const next = { ...paused, paused: false, pausedRemainingSeconds: undefined, deadlineMs: Date.now() + seconds * 1000 }
+    persist(next); setCurrent(next); setRemaining(seconds)
   }
   async function cancel() {
     cancelingRef.current = true; setBusy(true); setError('')
@@ -148,9 +167,9 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
     <h1 id="practice-heading" className="timer-page-heading">{timeOfDay}</h1>
     <div className={`timer-card practice-timer-card ${active ? 'is-running' : ''} ${saved ? 'is-complete' : ''}`}>
       <div className="timer-label">Timer</div>
-      <TimerDial durationMinutes={active ? Math.round(active.plannedSeconds / 60) : minutes} remainingSeconds={displayRemaining} running={Boolean(active)} disabled={Boolean(active || saved)} onDurationChange={active || saved ? undefined : setMinutes} phaseLabel={saved ? 'well done' : active ? 'remaining' : 'minutes'} />
+      <TimerDial durationMinutes={active ? Math.round(active.plannedSeconds / 60) : minutes} remainingSeconds={displayRemaining} running={Boolean(active)} disabled={Boolean(active || saved)} onDurationChange={active || saved ? undefined : setMinutes} phaseLabel={saved ? 'well done' : active?.paused ? 'paused' : active ? 'remaining' : 'minutes'} />
       {!active && !saved && <button className="sound-preview" type="button" onClick={() => { unlockBowlAudio(); playBowl() }}>Preview sound</button>}
-      {active && <button className="text-button" onClick={() => void cancel()} disabled={busy}>End session early</button>}
+      {active && <div className="timer-session-actions"><button className="secondary-button" onClick={active.paused ? resume : pause} disabled={busy}>{active.paused ? 'Resume' : 'Pause'}</button><button className="text-button" onClick={() => void cancel()} disabled={busy}>End session early</button></div>}
       {saved && <><button className="primary-button" onClick={() => setReflection(true)}>Edit reflection <span>→</span></button><button className="text-button" onClick={beginNewSession}>New session</button></>}
       {!active && !saved && <button className="primary-button" onClick={() => void begin()} disabled={busy || disabled}>{busy ? 'Starting…' : user ? disabled ? 'Group practice active' : 'Begin practice' : 'Sign in to practice'} <span>→</span></button>}
       {error && <p className="practice-error" role="alert">{error} {active && completionFailedRef.current && <button onClick={() => { completionFailedRef.current = false; void completeNaturally(active) }}>Retry save</button>}</p>}

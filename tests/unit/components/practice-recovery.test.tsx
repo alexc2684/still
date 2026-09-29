@@ -17,6 +17,30 @@ describe('PracticeTimer recovery boundaries', () => {
     expect(vi.mocked(fetch)).not.toHaveBeenCalled()
   })
 
+  it('restores, resumes, and persists a paused session without counting down while paused', async () => {
+    const now = Date.now(); localStorage.setItem('still:practice:recovery-user', JSON.stringify({ sessionId: 'paused', startedAt: new Date(now - 30_000).toISOString(), deadlineMs: now - 1, plannedSeconds: 120, paused: true, pausedRemainingSeconds: 45 }))
+    const ui = userEvent.setup(); render(<PracticeTimer user={user} />)
+    await waitFor(() => expect(screen.getByText('paused')).toBeInTheDocument())
+    expect(screen.getByText('00:45')).toBeInTheDocument(); expect(fetch).not.toHaveBeenCalled()
+    await ui.click(screen.getByRole('button', { name: 'Resume' }))
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
+    const resumed = JSON.parse(localStorage.getItem('still:practice:recovery-user')!)
+    expect(resumed).toMatchObject({ sessionId: 'paused', paused: false }); expect(resumed.pausedRemainingSeconds).toBeUndefined(); expect(resumed.deadlineMs).toBeGreaterThan(now)
+  })
+
+  it('pauses an active session and ignores invalid persisted paused state', async () => {
+    const now = Date.now(); localStorage.setItem('still:practice:recovery-user', JSON.stringify({ sessionId: 'active-pause', startedAt: new Date(now - 1000).toISOString(), deadlineMs: now + 60_000, plannedSeconds: 60 }))
+    const ui = userEvent.setup(); render(<PracticeTimer user={user} />); await ui.click(await screen.findByRole('button', { name: 'Pause' }))
+    expect(screen.getByText('paused')).toBeInTheDocument(); expect(JSON.parse(localStorage.getItem('still:practice:recovery-user')!)).toMatchObject({ paused: true, pausedRemainingSeconds: 60 })
+    cleanup(); localStorage.setItem('still:practice:recovery-user', JSON.stringify({ sessionId: 'invalid-pause', startedAt: new Date(now - 1000).toISOString(), deadlineMs: now + 60_000, plannedSeconds: 60, paused: true, pausedRemainingSeconds: 61 }))
+    render(<PracticeTimer user={user} />); await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()); expect(screen.queryByText('paused')).not.toBeInTheDocument()
+  })
+
+  it('does not pause after the deadline has elapsed', async () => {
+    const now = Date.now(); localStorage.setItem('still:practice:recovery-user', JSON.stringify({ sessionId: 'just-expired', startedAt: new Date(now - 1000).toISOString(), deadlineMs: now + 60_000, plannedSeconds: 60 }))
+    render(<PracticeTimer user={user} />); const pause = await screen.findByRole('button', { name: 'Pause' }); vi.spyOn(Date, 'now').mockReturnValue(now + 60_001); fireEvent.click(pause); expect(screen.queryByText('paused')).not.toBeInTheDocument()
+  })
+
   it('restores a completion-pending session and retries its completion', async () => {
     const now = Date.now(); localStorage.setItem('still:practice:recovery-user', JSON.stringify({ sessionId: 'pending', startedAt: new Date(now - 60_000).toISOString(), deadlineMs: now + 60_000, plannedSeconds: 60, completionPending: true }))
     vi.mocked(fetch).mockResolvedValueOnce(reply({}))

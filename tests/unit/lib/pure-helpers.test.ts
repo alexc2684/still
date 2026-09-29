@@ -122,4 +122,21 @@ describe('bowl audio', () => {
     const throwing = await import('../../../src/lib/bowl')
     expect(() => throwing.playBowl()).not.toThrow()
   })
+
+  it('requests playback mode, tolerates audio-session and resume failures, and allows forced strikes', async () => {
+    const audioSession = { type: 'ambient' }; vi.stubGlobal('navigator', { audioSession })
+    let starts = 0
+    class AudioContextMock {
+      currentTime = 0; destination = {}; sampleRate = 1000
+      resume = vi.fn(() => Promise.reject(new Error('denied')))
+      createOscillator = vi.fn(() => ({ frequency: { setValueAtTime: vi.fn() }, connect: (x: unknown) => x, start: () => { starts++ }, stop: vi.fn(), type: '' }))
+      createGain = vi.fn(() => ({ gain: { value: 0, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() }, connect: (x: unknown) => x }))
+      createBuffer = vi.fn(() => ({ getChannelData: () => new Float32Array(90) }))
+      createBufferSource = vi.fn(() => ({ connect: (x: unknown) => x, start: () => { starts++ }, stop: vi.fn(), buffer: null }))
+      createBiquadFilter = vi.fn(() => ({ frequency: { setValueAtTime: vi.fn() }, connect: (x: unknown) => x, type: '' }))
+    }
+    vi.stubGlobal('window', { AudioContext: AudioContextMock }); const bowl = await import('../../../src/lib/bowl'); bowl.unlockBowlAudio(); await Promise.resolve(); bowl.playBowl(); const once = starts; bowl.playBowl(); expect(starts).toBe(once); bowl.playBowl(true); expect(starts).toBeGreaterThan(once); expect(audioSession.type).toBe('playback')
+    vi.resetModules(); const rejecting = {}; Object.defineProperty(rejecting, 'type', { set() { throw new Error('blocked') } }); vi.stubGlobal('navigator', { audioSession: rejecting }); class SyncResumeContext extends AudioContextMock { resume = vi.fn(() => { throw new Error('blocked') }) }; vi.stubGlobal('window', { AudioContext: SyncResumeContext }); const restricted = await import('../../../src/lib/bowl'); expect(() => restricted.unlockBowlAudio()).not.toThrow()
+    vi.resetModules(); vi.stubGlobal('navigator', undefined); vi.stubGlobal('window', {}); const noNavigator = await import('../../../src/lib/bowl'); expect(() => noNavigator.playBowl()).not.toThrow()
+  })
 })

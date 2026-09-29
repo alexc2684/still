@@ -2,6 +2,8 @@
 .timer-page-heading { margin: 0 0 28px; font-size: clamp(30px, 5vw, 44px); }
 .practice-timer-card .primary-button { margin-top: 5px; }
 .practice-timer-card .text-button:disabled { opacity: .55; cursor: wait; }
+.timer-session-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 4px; }
+.timer-session-actions .text-button { margin-top: 0; }
 .practice-error { width: min(100%, 430px); margin: 18px 0 0; color: #a14e42; font-size: 11px; line-height: 1.5; text-align: center; }
 .practice-error button { padding: 0; background: transparent; color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .reflection-modal { max-height: min(92svh, 760px); }

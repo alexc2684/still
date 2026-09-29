@@ -120,7 +120,7 @@ describe('Profile', () => {
     const calls = setupFetch(); const updated = vi.fn()
     render(<Profile onProfileUpdated={updated} />)
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Ada Lovelace' })).toBeInTheDocument())
-    expect(screen.getByText('12')).toBeInTheDocument(); expect(screen.getByText('1 / 3 days')).toBeInTheDocument()
+    expect(screen.getByText('12')).toBeInTheDocument(); expect(screen.getByText('1 / 3 practice days')).toBeInTheDocument()
     await userEvent.setup().selectOptions(screen.getByLabelText('Weekly practice goal'), '5')
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Days goal saved.'))
     expect(calls).toContain('PATCH /api/profile')

@@ -200,7 +200,7 @@ describe('Profile complete behavior', () => {
     })
     render(<Profile />)
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Ada' })).toBeInTheDocument())
-    expect(screen.getByText('0 / 3 days')).toBeInTheDocument()
+    expect(screen.getByText('0 / 3 practice days')).toBeInTheDocument()
     const u = userEvent.setup()
     await u.selectOptions(screen.getByLabelText('Time'), '8')
     await new Promise(resolve => setTimeout(resolve, 0))
@@ -291,13 +291,13 @@ describe('Profile complete behavior', () => {
 
   it('covers minimal stats defaults and reminder day add/remove paths', async () => {
     mockFetch({ '/api/profile/stats': response({ currentWeek: {}, totals: {}, weeks: [{ weekStart: '2026-09-01', minutes: 1 }] }), '/api/reminders': response({ settings: { enabled: false, hour: 19, days: [0, 1] }, vapidPublicKey: null }) })
-    render(<Profile />); await waitFor(() => expect(screen.getByRole('heading', { name: 'Ada' })).toBeInTheDocument()); expect(screen.getByText('0 / 3 days')).toBeInTheDocument(); await userEvent.setup().click(screen.getByRole('button', { name: 'Sep 1' })); expect(screen.getByText(/0 sessions · 0 practice days/)).toBeInTheDocument()
+    render(<Profile />); await waitFor(() => expect(screen.getByRole('heading', { name: 'Ada' })).toBeInTheDocument()); expect(screen.getByText('0 / 3 practice days')).toBeInTheDocument(); await userEvent.setup().click(screen.getByRole('button', { name: 'Sep 1' })); expect(screen.getByText(/0 sessions · 0 practice days/)).toBeInTheDocument()
     const days = screen.getAllByRole('button', { name: /^(M|T|W|F|S)$/ }); await userEvent.setup().click(days[0]); await userEvent.setup().click(days[2]);
   })
 
   it('covers singular goal text and missing minutes progress fallback', async () => {
     mockFetch({ '/api/auth/me': response({ user: { ...user, weeklyTarget: 1, weeklyMinutesTarget: 10 } }), '/api/profile/stats': response({ currentWeek: {}, totals: {} }) })
-    render(<Profile />); await waitFor(() => expect(screen.getByRole('heading', { name: 'Ada' })).toBeInTheDocument()); expect(screen.getByText('0 / 1 days')).toBeInTheDocument(); expect(screen.getByText(/10 minutes to goal/)).toBeInTheDocument()
+    render(<Profile />); await waitFor(() => expect(screen.getByRole('heading', { name: 'Ada' })).toBeInTheDocument()); expect(screen.getByText('0 / 1 practice days')).toBeInTheDocument(); expect(screen.getByText(/10 minutes to goal/)).toBeInTheDocument()
   })
 
   it('covers the final save, notification, cleanup, fallback, and singular branches', async () => {
