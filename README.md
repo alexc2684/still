@@ -57,3 +57,14 @@ Phone practice reminders are opt-in. The browser asks for notification
 permission only after the user taps Enable in Profile. Delivery runs hourly on
 the free public-repository GitHub Actions runner and is best effort around the
 chosen local hour; it does not promise exact-minute delivery.
+
+## Password reset
+
+Run `npm run db:migrate` before releasing password reset. Configure `APP_URL`
+with the canonical app origin, `RESEND_API_KEY` with a Resend sending key, and
+`AUTH_EMAIL_FROM` with a sender on a verified domain (for example,
+`Still <hello@example.com>`). Email is sent using the
+[Resend email API](https://resend.com/docs/api-reference/emails/send-email).
+Missing configuration produces a temporary-unavailability message; reset links
+are never returned by the API or logged. Links expire after 30 minutes. A
+successful reset invalidates all outstanding links and existing login sessions.

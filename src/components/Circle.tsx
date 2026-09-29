@@ -14,6 +14,7 @@ type Props = { signedIn: boolean; onSignIn: () => void; userId?: string };
 const relativeTime = (value: string) => { const minutes = Math.max(1, Math.round((Date.now() - new Date(value).getTime()) / 60000)); return minutes < 60 ? `${minutes}m ago` : minutes < 1440 ? `${Math.round(minutes / 60)}h ago` : `${Math.round(minutes / 1440)}d ago`; };
 
 export default function Circle({ signedIn, onSignIn, userId }: Props) {
+  const [memberCount, setMemberCount] = useState<number | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -26,7 +27,7 @@ export default function Circle({ signedIn, onSignIn, userId }: Props) {
   const load = useCallback(async () => {
     if (!signedIn) return;
     setLoading(true); setError('');
-    try { const response = await fetch('/api/feed', { credentials: 'include', cache: 'no-store' }); if (!response.ok) throw new Error('Could not load the circle'); setPosts((await response.json()).feed || []); }
+    try { const response = await fetch('/api/feed', { credentials: 'include', cache: 'no-store' }); if (!response.ok) throw new Error('Could not load the circle'); const body = await response.json(); setPosts(body.feed || []); setMemberCount(body.memberCount ?? null); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not load the circle'); }
     finally { setLoading(false); }
   }, [signedIn]);
@@ -43,6 +44,7 @@ export default function Circle({ signedIn, onSignIn, userId }: Props) {
   return <div className="content-view circle-view">
     <div className="view-header"><div><h1>Circle</h1></div><button className="round-button" onClick={() => void load()} aria-label="Refresh feed">↻</button></div>
     {error && <div className="circle-error" role="alert">{error} <button className="text-button" onClick={() => void load()}>Retry</button></div>}
+    {memberCount !== null && <p className="circle-member-count">{memberCount.toLocaleString()} {memberCount === 1 ? 'person' : 'people'} in the circle.</p>}
     <div className="feed-tabs"><button className="selected">Everyone</button></div>
     {!posts.length ? <div className="feed-empty"><div className="empty-mark">◌</div><h2>Your circle is quiet</h2><p>Complete a session to start the conversation.</p></div> : posts.map((post) => <article className="post circle-post" key={post.id}>
       <div className="post-head"><Avatar name={post.authorName} avatarKey={post.authorAvatarKey} size="medium" /><div><strong>{post.sharedSitId ? 'A shared sit' : post.authorName}</strong><span>{relativeTime(post.completedAt)}</span></div></div>

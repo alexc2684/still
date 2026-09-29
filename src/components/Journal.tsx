@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './journal.css'
 import { combineJournalNotes } from './journalNotes'
 
@@ -71,24 +71,33 @@ export default function Journal({ signedIn = true, onSignIn, onChanged, refreshK
   const [editing, setEditing] = useState<string | null>(null)
   const [saving, setSaving] = useState<string | null>(null)
 
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [loadedDate, setLoadedDate] = useState('')
+  const [summary, setSummary] = useState({ totalSessions: 0, totalMinutes: 0 })
+  const requestId = useRef(0)
+
   async function load() {
+    const id = ++requestId.current
     setLoading(true); setError('')
     try {
-      const [response, profileResponse] = await Promise.all([fetch('/api/sessions'), fetch('/api/auth/me')])
+      const [response, profileResponse] = await Promise.all([fetch(`/api/sessions?date=${selectedDate ?? 'today'}`), fetch('/api/auth/me')])
+      if (id !== requestId.current) return
       if (response.status === 401) { setUnauthorized(true); return }
       if (!response.ok) throw new Error('Unable to load your journal.')
       const body = await response.json()
+      if (id !== requestId.current) return
       setSessions(body.sessions ?? [])
+      setLoadedDate(body.date)
+      setSummary(body.summary)
       setPracticeDates(body.practiceDates ?? [])
       if (profileResponse.ok) { const profile = await profileResponse.json(); setTimezone(profile.user?.timezone || 'UTC') }
       setUnauthorized(false)
-    } catch (err) { setError(err instanceof Error ? err.message : 'Unable to load your journal.') }
-    finally { setLoading(false) }
+    } catch (err) { if (id === requestId.current) setError(err instanceof Error ? err.message : 'Unable to load your journal.') }
+    finally { if (id === requestId.current) setLoading(false) }
   }
-  useEffect(() => { if (signedIn) void load(); else setLoading(false) }, [signedIn, refreshKey])
+  useEffect(() => { if (signedIn) void load(); else setLoading(false); return () => { requestId.current += 1 } }, [signedIn, refreshKey, selectedDate])
 
   const completedSessions = useMemo(() => sessions.filter((session): session is JournalSession & { completedAt: string } => Boolean(session.completedAt)), [sessions])
-  const totalMinutes = useMemo(() => Math.round(completedSessions.reduce((sum, session) => sum + (session.elapsedSeconds || session.plannedSeconds), 0) / 60), [completedSessions])
   const today = useMemo(() => new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date()), [timezone])
   const monthTitle = month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
   const calendar = useMemo(() => {
@@ -119,24 +128,25 @@ export default function Journal({ signedIn = true, onSignIn, onChanged, refreshK
     onChanged?.()
   }
 
-  if (loading) return <section className="content-view"><div className="loading-state">Loading your journal…</div></section>
+  if (loading && !loadedDate) return <section className="content-view"><div className="loading-state">Loading your journal…</div></section>
   if (!signedIn || unauthorized) return <section className="empty-view"><div className="empty-mark">◌</div><h1>Keep your practice close.</h1><p>Sign in to see your sessions, reflections, and practice days.</p>{onSignIn && <button className="primary-button" onClick={onSignIn}>Sign in to Still <span>→</span></button>}</section>
 
   return <section className="content-view" aria-labelledby="journal-heading">
     <div className="view-header"><div><div className="eyebrow">Your practice</div><h1 id="journal-heading">Journal</h1></div></div>
-    {error && <p className="form-error" role="alert">{error}</p>}
-    <div className="journal-summary"><div><strong>{completedSessions.length}</strong><span>Total sessions</span></div><div><strong>{totalMinutes}</strong><span>Minutes practiced</span></div><div><strong>{currentStreak(practiceDates, today)}</strong><span>Current streak</span></div></div>
+    {error && <p className="form-error" role="alert">{error} <button className="text-button" onClick={() => void load()}>Retry</button></p>}
+    <div className="journal-summary"><div><strong>{summary.totalSessions}</strong><span>Total sessions</span></div><div><strong>{summary.totalMinutes}</strong><span>Minutes practiced</span></div><div><strong>{currentStreak(practiceDates, today)}</strong><span>Current streak</span></div></div>
     <div className="month-head"><button aria-label="Previous month" onClick={() => setMonth(value => new Date(value.getFullYear(), value.getMonth() - 1, 1))}>←</button><strong>{monthTitle}</strong><button aria-label="Next month" onClick={() => setMonth(value => new Date(value.getFullYear(), value.getMonth() + 1, 1))}>→</button></div>
-    <div className="calendar" aria-label={`${monthTitle} practice calendar`}>{dayLabels.map((day, index) => <span className="calendar-label" key={`${day}-${index}`}>{day}</span>)}{calendar.map((date, index) => date ? <span key={localDate(date)} className={`${practiceDates.includes(localDate(date)) ? 'meditated ' : ''}${localDate(date) === localDate(new Date()) ? 'today' : ''}`} aria-label={localDate(date)}>{date.getDate()}</span> : <span aria-hidden="true" key={`blank-${index}`} />)}</div>
+    <div className="calendar" aria-label={`${monthTitle} practice calendar`}>{dayLabels.map((day, index) => <span className="calendar-label" key={`${day}-${index}`}>{day}</span>)}{calendar.map((date, index) => date ? <button type="button" onClick={() => { setSelectedDate(localDate(date)); setEditing(null) }} aria-pressed={localDate(date) === (selectedDate ?? loadedDate)} key={localDate(date)} className={`${practiceDates.includes(localDate(date)) ? 'meditated ' : ''}${localDate(date) === today ? 'today' : ''}`} aria-label={localDate(date)}>{date.getDate()}</button> : <span aria-hidden="true" key={`blank-${index}`} />)}</div>
     <div className="journal-prompt"><span>✦</span><div><strong>{bestStreak(practiceDates)} days is your best rhythm.</strong><p>Return when it helps. There is no perfect streak.</p></div></div>
-    {completedSessions.length === 0 ? <div className="feed-empty"><div className="empty-mark">◌</div><h2>Your journal begins here.</h2><p>Complete a practice to start noticing your pattern over time.</p></div> : <div className="journal-entries">{completedSessions.map(session => <JournalEntry key={session.id} session={session} editing={editing === session.id} saving={saving === session.id} onEdit={() => setEditing(session.id)} onCancel={() => setEditing(null)} onSave={notes => updateNotes(session, notes)} onDelete={() => remove(session)} />)}</div>}
+    <h2 className="journal-day-heading">{new Date(`${selectedDate ?? (loadedDate || today)}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h2>
+    {loading ? <p role="status">Loading reflections…</p> : !loadedDate || loadedDate !== (selectedDate ?? loadedDate) ? null : completedSessions.length === 0 ? <div className="feed-empty"><div className="empty-mark">◌</div><h2>No practice recorded for this day.</h2><p>Select a highlighted day to revisit your reflections.</p></div> : <div className="journal-entries">{completedSessions.map(session => <JournalEntry key={session.id} session={session} timezone={timezone} editing={editing === session.id} saving={saving === session.id} onEdit={() => setEditing(session.id)} onCancel={() => setEditing(null)} onSave={notes => updateNotes(session, notes)} onDelete={() => remove(session)} />)}</div>}
   </section>
 }
 
-function JournalEntry({ session, editing, saving, onEdit, onCancel, onSave, onDelete }: { session: JournalSession & { completedAt: string }; editing: boolean; saving: boolean; onEdit: () => void; onCancel: () => void; onSave: (notes: Pick<JournalSession, 'beforeMood' | 'duringMood' | 'afterMood'> & { notes: string }) => void; onDelete: () => void }) {
+function JournalEntry({ session, timezone, editing, saving, onEdit, onCancel, onSave, onDelete }: { session: JournalSession & { completedAt: string }; timezone: string; editing: boolean; saving: boolean; onEdit: () => void; onCancel: () => void; onSave: (notes: Pick<JournalSession, 'beforeMood' | 'duringMood' | 'afterMood'> & { notes: string }) => void; onDelete: () => void }) {
   const [notes, setNotes] = useState(combineJournalNotes(session))
   const [moods, setMoods] = useState<{ beforeMood: Mood | null; duringMood: Mood | null; afterMood: Mood | null }>({ beforeMood: session.beforeMood ?? null, duringMood: session.duringMood ?? null, afterMood: session.afterMood ?? null })
   useEffect(() => { if (editing) { setNotes(combineJournalNotes(session)); setMoods({ beforeMood: session.beforeMood ?? null, duringMood: session.duringMood ?? null, afterMood: session.afterMood ?? null }) } }, [editing, session])
-  const date = session.completedAt
-  return <article className="post journal-entry"><div className="post-head"><span className="session-glyph">◌</span><div><strong>{new Date(date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</strong><span>{formatMinutes(session.elapsedSeconds || session.plannedSeconds)} minutes</span></div><button className="more" onClick={onDelete} aria-label="Delete session and reflection">Delete</button></div>{editing ? <div className="reflection-form"><div className="mood-row">{(['before', 'during', 'after'] as const).map(stage => <div className="reflection-stage" key={stage}><span className="eyebrow">{stage}</span><div className="mood-picker" role="group" aria-label={`${stage} mood`}>{[1, 2, 3, 4, 5].map(value => <button type="button" key={value} className={moods[`${stage}Mood`] === value ? 'selected' : ''} onClick={() => setMoods(current => ({ ...current, [`${stage}Mood`]: value as Mood }))} aria-label={`${value} of 5`}>{value}</button>)}</div></div>)}</div><label className="notes-field"><span className="eyebrow">Notes</span><textarea maxLength={6500} value={notes} onChange={event => setNotes(event.target.value)} placeholder="What did you notice?" /></label><div><button className="primary-button" disabled={saving} onClick={() => onSave({ ...moods, notes })}>{saving ? 'Saving…' : 'Save reflection'}</button><button className="text-button" onClick={onCancel}>Cancel</button></div></div> : <><div className="reflection-moods">{(['before', 'during', 'after'] as const).map(stage => { const mood = session[`${stage}Mood`]; return <span key={stage}><b>{stage}</b>{mood ? `${mood}/5 · ${moodLabels[mood - 1]}` : 'No mood recorded'}</span> })}</div><p className="reflection-notes-block">{combineJournalNotes(session) || 'No notes yet.'}</p><button className="link-button" onClick={onEdit}>{session.afterNote || session.duringNote || session.beforeNote ? 'Edit reflection' : 'Add reflection'} <span>→</span></button></>}</article>
+  const date = session.completedLocalDate ? `${session.completedLocalDate}T12:00:00` : session.completedAt
+  return <article className="post journal-entry"><div className="post-head"><span className="session-glyph">◌</span><div><strong>{new Date(date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', ...(session.completedLocalDate ? {} : { timeZone: timezone }) })}</strong><span>{formatMinutes(session.elapsedSeconds || session.plannedSeconds)} minutes</span></div><button className="more" onClick={onDelete} aria-label="Delete session and reflection">Delete</button></div>{editing ? <div className="reflection-form"><div className="mood-row">{(['before', 'during', 'after'] as const).map(stage => <div className="reflection-stage" key={stage}><span className="eyebrow">{stage}</span><div className="mood-picker" role="group" aria-label={`${stage} mood`}>{[1, 2, 3, 4, 5].map(value => <button type="button" key={value} className={moods[`${stage}Mood`] === value ? 'selected' : ''} onClick={() => setMoods(current => ({ ...current, [`${stage}Mood`]: value as Mood }))} aria-label={`${value} of 5`}>{value}</button>)}</div></div>)}</div><label className="notes-field"><span className="eyebrow">Notes</span><textarea maxLength={6500} value={notes} onChange={event => setNotes(event.target.value)} placeholder="What did you notice?" /></label><div><button className="primary-button" disabled={saving} onClick={() => onSave({ ...moods, notes })}>{saving ? 'Saving…' : 'Save reflection'}</button><button className="text-button" onClick={onCancel}>Cancel</button></div></div> : <><div className="reflection-moods">{(['before', 'during', 'after'] as const).map(stage => { const mood = session[`${stage}Mood`]; return <span key={stage}><b>{stage}</b>{mood ? `${mood}/5 · ${moodLabels[mood - 1]}` : 'No mood recorded'}</span> })}</div><p className="reflection-notes-block">{combineJournalNotes(session) || 'No notes yet.'}</p><button className="link-button" onClick={onEdit}>{session.afterNote || session.duringNote || session.beforeNote ? 'Edit reflection' : 'Add reflection'} <span>→</span></button></>}</article>
 }

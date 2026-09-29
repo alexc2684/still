@@ -28,3 +28,10 @@
 .profile-action span { width: 30px; color: var(--sage-dark); font-size: 18px; }
 .profile-action strong { font-size: 12px; font-weight: 600; }
 @media (max-width: 600px) { .reflection-moods, .mood-row { grid-template-columns: 1fr; gap: 12px; } }
+
+.calendar button { display: grid; place-items: center; aspect-ratio: 1; border-radius: 50%; background: transparent; color: var(--muted); font-size: 11px; }
+.calendar button.meditated { background: #dce6d7; color: var(--ink); }
+.calendar button.today { outline: 1px solid var(--sage-dark); outline-offset: -2px; }
+.calendar button[aria-pressed="true"] { background: var(--sage-dark); color: white; }
+.calendar button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.journal-day-heading { font-size: 16px; margin-top: 28px; }

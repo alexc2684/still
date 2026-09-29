@@ -30,7 +30,7 @@ const req = (method = 'POST', body?: unknown, url = 'https://still.test/api') =>
 })
 const ctx = (p: Record<string, string>) => ({ params: Promise.resolve(p) as any })
 const response = async (p: Promise<Response>) => ({ status: (await p).status, body: await (await p).json().catch(() => null) })
-const queue = (...rows: any[][]) => { let i = 0; h.db.mockImplementation(async () => rows[i++] ?? []); h.sql.mockReturnValue(h.db) }
+const queue = (...rows: any[][]) => { let i = 0; h.db.mockImplementation(async (query: string) => query.includes('COUNT(*)::int AS "memberCount" FROM users') ? [{ memberCount: 42 }] : rows[i++] ?? []); h.sql.mockReturnValue(h.db) }
 
 beforeEach(() => {
   vi.clearAllMocks(); h.user.mockResolvedValue(user); h.origin.mockResolvedValue(undefined); h.rate.mockResolvedValue(true)
@@ -76,7 +76,7 @@ describe('auth routes', () => {
 describe('session routes', () => {
   it('starts and lists sessions', async () => {
     const start = await import('@/app/api/sessions/start/route'); queue([{ id: 's1', started_at: 'now', planned_seconds: 60, name: null }]); expect((await response(start.POST(req('POST', { plannedSeconds: 60 })))).status).toBe(201)
-    const list = await import('@/app/api/sessions/route'); queue([{ id: 's1' }], [{ date: '2026-09-27' }]); expect((await response(list.GET())).status).toBe(200); queue([]); expect((await response(list.GET())).status).toBe(200)
+    const list = await import('@/app/api/sessions/route'); queue([{ id: 's1' }], [{ date: '2026-09-27' }]); expect((await response(list.GET(req('GET')))).status).toBe(200); queue([]); expect((await response(list.GET(req('GET')))).status).toBe(200)
   })
   it('validates start input and deletes only owned non-shared sessions', async () => {
     const start = await import('@/app/api/sessions/start/route'); expect((await response(start.POST(req('POST', { plannedSeconds: 0 })))).status).toBe(400)
@@ -244,7 +244,7 @@ describe('API branch boundaries', () => {
 
     const sessions = await import('@/app/api/sessions/route')
     h.user.mockRejectedValueOnce(new Response('no', { status: 401 }))
-    expect((await response(sessions.GET())).status).toBe(401)
+    expect((await response(sessions.GET(req('GET')))).status).toBe(401)
     const session = await import('@/app/api/sessions/[id]/route')
     h.origin.mockRejectedValueOnce(new Response('bad', { status: 403 }))
     expect((await response(session.DELETE(req('DELETE'), ctx({ id: 'x' })))).status).toBe(403)

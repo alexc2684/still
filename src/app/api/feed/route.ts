@@ -16,7 +16,8 @@ export async function GET() {
     for (const history of historyRows as AchievementSession[]) (histories[history.userId!] ||= []).push(history)
     const historyFor = (userId: string) => histories[userId] || []
 
-    return json({ feed: rows.map((row: any) => {
+    const [{ memberCount }] = await db(`SELECT COUNT(*)::int AS "memberCount" FROM users`)
+    return json({ memberCount, feed: rows.map((row: any) => {
       const participants = (row.participants || []).map((participant: any) => ({
         userId: participant.userId,
         name: participant.name,

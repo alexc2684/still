@@ -70,7 +70,7 @@ describe('API regression boundaries', () => {
   it('returns database failures as stable API errors', async () => {
     db.mockRejectedValue(new Error('database unavailable'))
     const { GET } = await import('@/app/api/sessions/route')
-    expect(await status(GET())).toBe(500)
+    expect(await status(GET(new Request('https://still.test/api/sessions')))).toBe(500)
     const feed = await import('@/app/api/feed/route')
     expect(await status(feed.GET())).toBe(500)
   })
