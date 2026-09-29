@@ -80,3 +80,11 @@ it('keeps participant controls usable when a feed snapshot omits its participant
   fireEvent.click(await screen.findByRole('button', { name: 'Add participant' }))
   expect(await screen.findByRole('button', { name: /Friend/ })).toBeEnabled()
 })
+it('does not load or display Circle membership for an anonymous visitor', () => {
+  const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher)
+  render(<Circle signedIn={false} onSignIn={vi.fn()} />)
+  expect(screen.getByText('Find your circle')).toBeInTheDocument()
+  expect(screen.queryByRole('list', { name: 'People in your circle' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /people in your circle/ })).not.toBeInTheDocument()
+  expect(fetcher).not.toHaveBeenCalled()
+})

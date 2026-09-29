@@ -31,9 +31,9 @@ describe('SharedSit complete behavior', () => {
     fetchMock.mockResolvedValueOnce(response({ room: room({ plannedSeconds: 600 }) })); render(<SharedSit user={host} onSignIn={vi.fn()} initialToken="abc" />); await waitFor(() => expect(screen.getByTestId('dial')).toHaveTextContent('minutes:600')); cleanup()
     const now = Date.now(); fetchMock.mockResolvedValueOnce(response({ room: room({ plannedSeconds: 600, status: 'running', startedAt: new Date(now + 3000).toISOString(), endsAt: new Date(now + 603000).toISOString() }) })); render(<SharedSit user={host} onSignIn={vi.fn()} initialToken="abc" />); await waitFor(() => expect(screen.getByTestId('dial')).toHaveTextContent(/Starting in/)); expect(screen.getByTestId('dial')).not.toHaveTextContent('36000')
   })
-  it('rings the host bell when the scheduled countdown reaches zero', async () => {
+  it('stays silent when the scheduled countdown reaches zero', async () => {
     vi.useFakeTimers(); const now = Date.now(); vi.setSystemTime(now); fetchMock.mockResolvedValueOnce(response({ room: room({ status: 'running', startedAt: new Date(now + 3000).toISOString(), endsAt: new Date(now + 63_000).toISOString() }) })); render(<SharedSit user={host} onSignIn={vi.fn()} initialToken="abc" />)
-    await act(async () => { await Promise.resolve() }); expect(playBowl).not.toHaveBeenCalled(); await act(async () => { await vi.advanceTimersByTimeAsync(3000) }); expect(playBowl).toHaveBeenCalledWith(true); vi.useRealTimers()
+    await act(async () => { await Promise.resolve() }); expect(playBowl).not.toHaveBeenCalled(); await act(async () => { await vi.advanceTimersByTimeAsync(3000) }); expect(playBowl).not.toHaveBeenCalled(); vi.useRealTimers()
   })
   afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
@@ -224,4 +224,30 @@ it('does not play a late start bell with one minute left, survives wall-clock ju
   await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
   expect(playBowl).toHaveBeenCalledTimes(1)
   cleanup(); vi.useRealTimers(); vi.unstubAllGlobals()
+})
+
+it.each([1, 3, 10])('a single-host shared sit stays silent after the countdown and rings after %i minutes', async minutes => {
+  vi.useFakeTimers(); localStorage.clear(); playBowl.mockReset(); unlockBowlAudio.mockReset()
+  let state = 'waiting', started = 0
+  const snapshot = () => room({ status: state, plannedSeconds: minutes * 60, serverNow: new Date().toISOString(), startedAt: started ? new Date(started).toISOString() : null, endsAt: started ? new Date(started + minutes * 60000).toISOString() : null, ownSessionId: state === 'waiting' ? null : 'single-host' })
+  fetchMock.mockImplementation(async (url: string) => {
+    if (url.endsWith('/start')) { state = 'running'; started = Date.now() + 3000; return response({}) }
+    if (url.endsWith('/complete')) { state = 'completed'; return response({}) }
+    return response({ room: snapshot() })
+  }); vi.stubGlobal('fetch', fetchMock)
+  try {
+    render(<SharedSit user={host} onSignIn={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText('Duration'), { target: { value: String(minutes) } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Create private sit/ })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Start shared sit/ })) })
+    expect(unlockBowlAudio).toHaveBeenCalled(); expect(playBowl).not.toHaveBeenCalled()
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+    expect(playBowl).not.toHaveBeenCalled(); expect(screen.getByTestId('dial')).toHaveTextContent(`remaining:${minutes * 60}`)
+    await act(async () => { await vi.advanceTimersByTimeAsync(minutes * 60000 - 1000) })
+    expect(playBowl).not.toHaveBeenCalled()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    expect(playBowl).toHaveBeenCalledTimes(1)
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+    expect(playBowl).toHaveBeenCalledTimes(1)
+  } finally { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); window.history.replaceState({}, '', '/') }
 })

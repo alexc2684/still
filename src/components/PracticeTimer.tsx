@@ -125,7 +125,6 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
       if (!startedAt) throw new Error('The server did not return a start time.')
       const next = { sessionId: body.session.id, startedAt, deadlineMs: new Date(startedAt).getTime() + Math.round(plannedSeconds) * 1000, plannedSeconds: Math.round(plannedSeconds) }
       persist(next); setSaved(false); setCurrent(next); setRemaining(plannedSeconds)
-      playBowl(true)
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not begin your practice.') } finally { setBusy(false) }
   }
   function pause() {

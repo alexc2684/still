@@ -1,6 +1,8 @@
 # Still
 
 Still is a meditation timer and social practice log deployed as a Next.js PWA.
+Circle membership includes registered accounts only; anonymous visitors are not
+counted or listed. Registered accounts remain members when signed out.
 
 For a shared practice, open **Together** from Practice, create a sit, and share
 the invitation link with friends. Friends sign in with their existing Still
@@ -48,7 +50,7 @@ separate manual production deployment is not required.
 
 The timer uses elapsed wall-clock time so it does not drift when a tab is
 backgrounded, and solo sessions can be paused and resumed. Browser audio
-requires an initial user gesture. Start and end bells are supported while the
+requires an initial user gesture. The completion bell is supported while the
 page is active; iOS playback mode is requested when available, but background or
 locked-screen audio still needs on-device verification and is not guaranteed by
 a web PWA.
