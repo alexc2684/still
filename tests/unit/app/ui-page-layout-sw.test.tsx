@@ -2,7 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/components/PracticeTimer', () => ({ default: ({ onActiveChange, onSignIn, onSessionSaved }: { onActiveChange: (v: boolean) => void; onSignIn: () => void; onSessionSaved: () => void }) => <><button onClick={() => onActiveChange(true)}>Mock timer</button><button onClick={onSignIn}>Timer sign in</button><button onClick={onSessionSaved}>Timer saved</button></> }))
+vi.mock('@/components/PracticeTimer', () => ({ default: ({ onActiveChange, onSignIn, onSessionSaved }: { onActiveChange: (v: boolean) => void; onSignIn: () => void; onSessionSaved: () => void }) => <><button onClick={() => onActiveChange(true)}>Mock timer</button><button onClick={() => onActiveChange(false)}>Stop timer</button><button onClick={onSignIn}>Timer sign in</button><button onClick={onSessionSaved}>Timer saved</button></> }))
+vi.mock('@/components/WalkingMeditation', () => ({ default: ({ onActiveChange, onSignIn, onSessionSaved }: { onActiveChange: (v: boolean) => void; onSignIn: () => void; onSessionSaved: () => void }) => <><button onClick={() => onActiveChange(true)}>Mock walk</button><button onClick={() => onActiveChange(false)}>Stop walk</button><button onClick={onSignIn}>Walk sign in</button><button onClick={onSessionSaved}>Walk saved</button></> }))
 vi.mock('@/components/SharedSit', () => ({ default: ({ onActiveChange, onSignIn, onSessionSaved }: { onActiveChange: (v: boolean) => void; onSignIn: () => void; onSessionSaved: () => void }) => <><button onClick={() => onActiveChange(true)}>Mock shared sit</button><button onClick={onSignIn}>Shared sign in</button><button onClick={onSessionSaved}>Shared saved</button></> }))
 vi.mock('@/components/Journal', () => ({ default: ({ onSignIn, onChanged }: { onSignIn: () => void; onChanged: () => void }) => <><button onClick={onSignIn}>Journal sign in</button><button onClick={onChanged}>Journal changed</button></> }))
 vi.mock('@/components/Profile', () => ({ default: ({ onSignIn, onSignOut, onProfileUpdated }: { onSignIn: () => void; onSignOut: () => void; onProfileUpdated: (u: unknown) => void }) => <><button onClick={onSignIn}>Profile sign in</button><button onClick={onSignOut}>Profile sign out</button><button onClick={() => onProfileUpdated({ id: 'u', name: 'Updated', email: 'u', timezone: 'UTC' })}>Profile updated</button></> }))
@@ -26,6 +27,7 @@ describe('home shell', () => {
     await user.click(screen.getByRole('button', { name: 'Solo' })); expect(screen.getByRole('button', { name: 'Solo' })).toHaveAttribute('aria-pressed', 'true')
     await user.click(screen.getByRole('button', { name: /timer sign in/i })); await user.click(screen.getByRole('button', { name: 'Close sign in' }))
     await user.click(screen.getByText('Timer saved'))
+    await user.click(screen.getByRole('button', { name: 'Walk' })); await user.click(screen.getByText('Walk saved')); await user.click(screen.getByText('Walk sign in')); await user.click(screen.getByRole('button', { name: 'Close sign in' })); await user.click(screen.getByRole('button', { name: 'Sit' }))
     await user.click(screen.getByRole('button', { name: 'Together' })); await user.click(screen.getByText('Shared saved'))
     await user.click(screen.getByRole('button', { name: /circle/i })); expect(screen.getByText('Circle sign in')).toBeInTheDocument(); await user.click(screen.getByText('Circle sign in')); await user.click(screen.getByRole('button', { name: 'Close sign in' }))
     await user.click(screen.getByRole('button', { name: /journal/i })); expect(screen.getByText('Journal sign in')).toBeInTheDocument(); await user.click(screen.getByText('Journal sign in')); await user.click(screen.getByRole('button', { name: 'Close sign in' }))
@@ -65,6 +67,9 @@ describe('home shell', () => {
     window.history.pushState({}, '', '/')
     vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/auth/me' ? response({ user: { id: 'u', name: 'Ada', email: 'a', timezone: 'UTC' } }) : response({}, false)))
     render(<Home />); await waitFor(() => expect(screen.getAllByRole('button', { name: 'Solo' }).length).toBeGreaterThan(0))
+  })
+  it('routes walking activity state', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({}, false))); const user = userEvent.setup(); render(<Home />); await waitFor(() => expect(screen.getByRole('button', { name: 'Walk' })).toBeInTheDocument()); await user.click(screen.getByRole('button', { name: 'Walk' })); await user.click(screen.getByText('Mock walk')); expect(screen.queryByRole('button', { name: 'Sit' })).not.toBeInTheDocument(); await user.click(screen.getByText('Stop walk')); expect(screen.getByRole('button', { name: 'Sit' })).toBeInTheDocument(); await user.click(screen.getByRole('button', { name: 'Sit' })); await user.click(screen.getByText('Mock timer')); await user.click(screen.getByText('Stop timer'))
   })
 })
 
