@@ -5,7 +5,7 @@ export default function WalkingPlant({
   progress?: number;
   complete?: boolean;
 }) {
-  const growth = complete ? 1 : Math.max(0.16, Math.min(1, progress));
+  const growth = complete ? 1 : Math.max(0, Math.min(1, progress));
   const scale = 0.58 + growth * 0.42;
   return (
     <svg

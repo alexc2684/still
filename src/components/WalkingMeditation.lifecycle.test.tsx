@@ -115,7 +115,7 @@ describe("WalkingMeditation lifecycle isolation", () => {
     completion.resolve(response({}));
     await act(async () => { await completion.promise; });
     expect(screen.getByRole("button", { name: /Begin walk/ })).toBeInTheDocument();
-    expect(screen.queryByText("You made room to grow.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Practice complete" })).not.toBeInTheDocument();
     expect(completed).not.toHaveBeenCalled();
 
     const deletion = deferred<ReturnType<typeof response>>();
@@ -158,7 +158,7 @@ describe("WalkingMeditation lifecycle isolation", () => {
       coords: { latitude: 40, longitude: -73, accuracy: 5 } as GeolocationCoordinates,
       timestamp: 0,
     } as GeolocationPosition));
-    await waitFor(() => expect(view.container.querySelector(".gps-chip.connected")).not.toBeNull());
+    await waitFor(() => expect(JSON.parse(localStorage.getItem("still:walking:a")!).elapsedBeforePause).toBeGreaterThanOrEqual(0));
   });
 
   it("ignores a delayed completion failure after the account changes", async () => {

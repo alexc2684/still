@@ -1,13 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { playBowl, unlockBowlAudio } from "@/lib/bowl";
-import {
-  addWalkSample,
-  emptyWalkTrack,
-  intervalCueDue,
-  slowBonus,
-  type WalkTrack,
-} from "@/lib/walking";
+import { addWalkSample, emptyWalkTrack, intervalCueDue, walkingPlantProgress, walkGrowthSeconds, type WalkTrack } from "@/lib/walking";
 import { storageGet, storageRemove, storageSet } from "@/lib/practice-storage";
 import WalkingPlant from "./WalkingPlant";
 import "./walking-meditation.css";
@@ -18,9 +12,10 @@ type Session = {
   pausedRemainingSeconds?: number;
   intervalSeconds: number | null;
   elapsedBeforePause: number;
-  distanceMeters: number;
-  movingSeconds: number;
-  points: number;
+  distanceMeters?: number;
+  movingSeconds?: number;
+  points?: number;
+  growthSeconds?: number;
   completionPending?: boolean;
 };
 type Props = {
@@ -43,9 +38,6 @@ export default function WalkingMeditation({
     [session, setSession] = useState<Session | null>(null),
     [remaining, setRemaining] = useState(600),
     [track, setTrack] = useState<WalkTrack>(emptyWalkTrack),
-    [gps, setGps] = useState<
-      "idle" | "connecting" | "connected" | "unavailable" | "denied"
-    >("idle"),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [complete, setComplete] = useState(false);
@@ -54,13 +46,10 @@ export default function WalkingMeditation({
     finishing = useRef(false),
     completionBell = useRef(false),
     ending = useRef(false),
-    trackRef = useRef(track),
-    sessionRef = useRef(session),
     sessionOwnerKey = useRef<string | null>(null),
     accountGeneration = useRef(0),
-    watchGeneration = useRef(0);
-  trackRef.current = track;
-  sessionRef.current = session;
+    watchGeneration = useRef(0),
+    recoveredGrowth = useRef(0);
   const persist = useCallback(
     (v: Session | null) =>
       v ? storageSet(key, JSON.stringify(v)) : storageRemove(key),
@@ -68,45 +57,23 @@ export default function WalkingMeditation({
   );
   const stopGps = useCallback(() => {
     watchGeneration.current += 1;
-    if (watch.current !== null && navigator.geolocation)
-      navigator.geolocation.clearWatch(watch.current);
+    if (watch.current !== null && navigator.geolocation) navigator.geolocation.clearWatch(watch.current);
     watch.current = null;
   }, []);
   const startGps = useCallback(() => {
-    if (document.visibilityState !== "visible") return;
-    if (!navigator.geolocation) {
-      setGps("unavailable");
-      return;
-    }
+    if (document.visibilityState !== "visible" || !navigator.geolocation) return;
     stopGps();
-    const watchToken = watchGeneration.current;
-    setGps("connecting");
-    setTrack((v) => ({
-      ...v,
-      anchor: null,
-      candidate: null,
-      lastSample: null,
-      lastSpeedMps: null,
-    }));
-    watch.current = navigator.geolocation.watchPosition(
-      (p) => {
-        if (watchToken !== watchGeneration.current) return;
-        setGps("connected");
-        setTrack((v) =>
-          addWalkSample(v, {
-            latitude: p.coords.latitude,
-            longitude: p.coords.longitude,
-            accuracy: p.coords.accuracy,
-            timestamp: p.timestamp || Date.now(),
-          }),
-        );
-      },
-      (e) => {
-        if (watchToken === watchGeneration.current)
-          setGps(e.code === 1 ? "denied" : "unavailable");
-      },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
-    );
+    const token = watchGeneration.current;
+    setTrack((value) => ({ ...value, anchor: null, candidate: null, lastSample: null, lastSpeedMps: null }));
+    watch.current = navigator.geolocation.watchPosition((position) => {
+      if (token !== watchGeneration.current) return;
+      setTrack((value) => addWalkSample(value, {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        timestamp: position.timestamp || Date.now(),
+      }));
+    }, () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
   }, [stopGps]);
   const finish = useCallback(
     async (s: Session) => {
@@ -162,13 +129,13 @@ export default function WalkingMeditation({
     accountGeneration.current += 1;
     stopGps();
     setTrack(emptyWalkTrack());
-    setGps("idle");
     setSession(null);
     sessionOwnerKey.current = null;
     setComplete(false);
     setBusy(false);
     setError("");
     previousElapsed.current = 0;
+    recoveredGrowth.current = 0;
     completionBell.current = false;
     ending.current = false;
     if (!key) {
@@ -186,13 +153,10 @@ export default function WalkingMeditation({
           s.plannedSeconds > 0 &&
           s.plannedSeconds <= 7200 &&
           Number.isFinite(s.elapsedBeforePause) &&
-          Number.isFinite(s.distanceMeters) &&
-          s.distanceMeters >= 0 &&
-          Number.isFinite(s.movingSeconds) &&
-          s.movingSeconds >= 0 &&
-          s.movingSeconds <= s.plannedSeconds &&
-          Number.isFinite(s.points) &&
-          s.points >= 0 &&
+          (s.distanceMeters === undefined || (Number.isFinite(s.distanceMeters) && s.distanceMeters >= 0)) &&
+          (s.movingSeconds === undefined || (Number.isFinite(s.movingSeconds) && s.movingSeconds >= 0 && s.movingSeconds <= s.plannedSeconds)) &&
+          (s.points === undefined || (Number.isFinite(s.points) && s.points >= 0)) &&
+          (s.growthSeconds === undefined || (Number.isFinite(s.growthSeconds) && s.growthSeconds >= 0)) &&
           (s.intervalSeconds === null ||
             (Number.isFinite(s.intervalSeconds) &&
               s.intervalSeconds > 0 &&
@@ -208,12 +172,8 @@ export default function WalkingMeditation({
       previousElapsed.current = s.elapsedBeforePause || 0;
       setMinutes(Math.round(s.plannedSeconds / 60));
       setIntervalMinutes(s.intervalSeconds ? s.intervalSeconds / 60 : 0);
-      setTrack({
-        ...emptyWalkTrack(),
-        distanceMeters: s.distanceMeters,
-        movingSeconds: s.movingSeconds,
-        points: s.points,
-      });
+      s.growthSeconds ??= Math.max(0, (s.points || 0) * 6 - (s.movingSeconds || 0));
+      recoveredGrowth.current = s.growthSeconds;
       sessionOwnerKey.current = key;
       setSession(s);
       if (s.pausedRemainingSeconds) setRemaining(s.pausedRemainingSeconds);
@@ -229,17 +189,15 @@ export default function WalkingMeditation({
     onActiveChange?.(Boolean(session || complete));
     return () => onActiveChange?.(false);
   }, [session, complete, onActiveChange]);
-  useEffect(() => () => stopGps(), [stopGps]);
   useEffect(() => {
     const visibility = () => {
-      const current = sessionRef.current;
+      const current = session;
       if (document.visibilityState !== "visible") stopGps();
-      else if (current && !current.pausedRemainingSeconds && !current.completionPending && !ending.current)
-        startGps();
+      else if (current && !current.pausedRemainingSeconds && !current.completionPending && !ending.current) startGps();
     };
     document.addEventListener("visibilitychange", visibility);
     return () => document.removeEventListener("visibilitychange", visibility);
-  }, [startGps, stopGps]);
+  }, [session, startGps, stopGps]);
   useEffect(() => {
     if (
       !session ||
@@ -268,16 +226,11 @@ export default function WalkingMeditation({
       persist({
         ...session,
         elapsedBeforePause: elapsed,
-        distanceMeters: trackRef.current.distanceMeters,
-        movingSeconds: trackRef.current.movingSeconds,
-        points: trackRef.current.points,
+        growthSeconds: session.growthSeconds || 0,
       });
       if (!next && !ending.current)
         void finish({
           ...session,
-          distanceMeters: trackRef.current.distanceMeters,
-          movingSeconds: trackRef.current.movingSeconds,
-          points: trackRef.current.points,
         });
     };
     tick();
@@ -285,28 +238,17 @@ export default function WalkingMeditation({
     return () => clearInterval(id);
   }, [
     session,
-    track.distanceMeters,
-    track.movingSeconds,
-    track.points,
     finish,
     persist,
   ]);
   useEffect(() => {
-    if (session && !session.completionPending && sessionOwnerKey.current === key)
-      persist({
-        ...session,
-        elapsedBeforePause: previousElapsed.current,
-        distanceMeters: track.distanceMeters,
-        movingSeconds: track.movingSeconds,
-        points: track.points,
-      });
-  }, [
-    track.distanceMeters,
-    track.movingSeconds,
-    track.points,
-    session,
-    persist,
-  ]);
+    if (!session || session.pausedRemainingSeconds || session.completionPending || sessionOwnerKey.current !== key) return;
+    const growthSeconds = recoveredGrowth.current + walkGrowthSeconds(track);
+    if (growthSeconds === (session.growthSeconds || 0)) return;
+    const next = { ...session, growthSeconds };
+    persist(next);
+    setSession(next);
+  }, [key, persist, session, track.movingSeconds, track.points]);
   async function begin() {
     if (!user) {
       onSignIn?.();
@@ -347,11 +289,10 @@ export default function WalkingMeditation({
           plannedSeconds: planned,
           intervalSeconds: intervalMinutes ? intervalMinutes * 60 : null,
           elapsedBeforePause: 0,
-          distanceMeters: 0,
-          movingSeconds: 0,
-          points: 0,
+          growthSeconds: 0,
         };
       previousElapsed.current = 0;
+      recoveredGrowth.current = 0;
       playBowl(true);
       setTrack(emptyWalkTrack());
       setRemaining(planned);
@@ -372,9 +313,6 @@ export default function WalkingMeditation({
     if (left <= 0) {
       void finish({
         ...current,
-        distanceMeters: trackRef.current.distanceMeters,
-        movingSeconds: trackRef.current.movingSeconds,
-        points: trackRef.current.points,
       });
       return;
     }
@@ -383,9 +321,6 @@ export default function WalkingMeditation({
         ...current,
         pausedRemainingSeconds: left,
         elapsedBeforePause: current.plannedSeconds - left,
-        distanceMeters: track.distanceMeters,
-        movingSeconds: track.movingSeconds,
-        points: track.points,
       };
     stopGps();
     persist(s);
@@ -421,7 +356,6 @@ export default function WalkingMeditation({
       setSession(null);
       setTrack(emptyWalkTrack());
       setRemaining(minutes * 60);
-      setGps("idle");
     } catch (e) {
       if (accountToken !== accountGeneration.current) return;
       setError(e instanceof Error ? e.message : "Could not end this walk.");
@@ -433,39 +367,20 @@ export default function WalkingMeditation({
   }
   const format = (s: number) =>
       `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`,
-    averageBonus = track.movingSeconds
-      ? (track.points * 6) / track.movingSeconds
-      : 0,
-    unhurried = averageBonus >= 1.2,
-    pace = track.lastSpeedMps
-      ? `${(track.lastSpeedMps * 3.6).toFixed(1)} km/h`
-      : "—";
+    plantProgress = session ? walkingPlantProgress(session.plannedSeconds, remaining, session.growthSeconds || 0) : 0;
   if (complete)
     return (
       <section className="walking-view walking-complete">
         <div className="walking-eyebrow">Walking meditation</div>
-        <h1>You made room to grow.</h1>
+        <h1>Practice complete</h1>
         <WalkingPlant complete />
-        <div className="walking-points-total">{Math.round(track.points)}</div>
-        <div className="walking-points-label">mindful points</div>
-        <p>
-          {minutes} minutes · {Math.round(track.distanceMeters)} m
-        </p>
-        <span className="walking-badge">
-          {unhurried ? "⌁ Unhurried" : "Practice complete"}
-        </span>
-        <p className="walking-note">
-          More points for slower confirmed movement.
-          <br />
-          Standing still pauses points.
-        </p>
+        <p>{minutes} {minutes === 1 ? "minute" : "minutes"}</p>
         <button
           className="primary-button"
           onClick={() => {
             setComplete(false);
             setRemaining(minutes * 60);
             setTrack(emptyWalkTrack());
-            setGps("idle");
           }}
         >
           Finish practice <span>→</span>
@@ -476,12 +391,7 @@ export default function WalkingMeditation({
     <section className={`walking-view ${!session ? "walking-setup" : "walking-active"}`}>
       {!session && (
         <>
-          <div className="walking-eyebrow">Walking meditation</div>
-          <h1>Grow calm, one step at a time.</h1>
-          <p className="walking-intro">
-            Slow, steady movement helps the plant grow. Your location stays on
-            this device and is reduced to distance and points.
-          </p>
+          <h1>Walking meditation</h1>
           <div className="walking-settings">
             <label>
               Duration
@@ -518,11 +428,7 @@ export default function WalkingMeditation({
               </select>
             </label>
           </div>
-          <WalkingPlant progress={0.16} />
-          <p className="walking-setup-note">
-            Keep Still open during your walk for GPS tracking and interval
-            bells. Lock-screen delivery depends on your browser.
-          </p>
+          <p className="walking-location-note">Walk slowly to help your plant grow. Location is used only on this device during the practice.</p>
           <button
             className="primary-button"
             disabled={busy || disabled}
@@ -545,44 +451,14 @@ export default function WalkingMeditation({
             <span className="walking-countdown">
               {format(remaining)} remaining
             </span>
-            <span className={`gps-chip ${gps}`}>
-              {gps === "connected"
-                ? "GPS connected"
-                : gps === "connecting"
-                  ? "Finding GPS"
-                  : gps === "denied"
-                    ? "Location denied"
-                    : "GPS unavailable"}
-            </span>
           </div>
           <h1>
             {session.pausedRemainingSeconds
               ? "Your walk is paused"
               : "Walking meditation"}
           </h1>
-          <WalkingPlant progress={1 - remaining / session.plannedSeconds} />
-          <div className="walking-growth-copy">Your calm is growing</div>
-          <div className="walking-score-card">
-            <div>
-              <strong>{Math.round(track.points)}</strong>
-              <span>mindful points</span>
-            </div>
-            <div>
-              <strong>
-                {track.lastSpeedMps
-                  ? `${slowBonus(track.lastSpeedMps).toFixed(1)}×`
-                  : "—"}
-              </strong>
-              <span>slow bonus</span>
-            </div>
-            <p>
-              {pace}
-              {track.lastSpeedMps && slowBonus(track.lastSpeedMps) > 0
-                ? " · Gentle pace"
-                : ""}
-            </p>
-            <small>⌁ Slow, steady steps help it grow.</small>
-          </div>
+          <WalkingPlant progress={plantProgress} />
+          <p className="walking-slow-note">Walk slowly to help your plant grow.</p>
           <div className="walking-actions">
             {session.completionPending ? (
               <button className="primary-button" disabled={busy} onClick={() => void finish(session)}>
@@ -605,12 +481,6 @@ export default function WalkingMeditation({
               End walk
             </button>
           </div>
-          {(gps === "denied" || gps === "unavailable") && (
-            <p className="walking-location-message">
-              No points without a reliable location. You can still use the
-              timer.
-            </p>
-          )}
         </>
       )}
       {error && (

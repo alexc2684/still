@@ -1,7 +1,7 @@
 .walking-view {
   max-width: 620px;
   margin: 0 auto;
-  padding: 22px 20px 34px;
+  padding: 8px 20px 20px;
   text-align: center;
   color: var(--ink);
 }
@@ -10,35 +10,22 @@
   font-size: clamp(31px, 7vw, 48px);
   font-weight: 500;
   line-height: 1.05;
-  margin: 16px auto 12px;
+  margin: 12px auto 18px;
   max-width: 540px;
 }
 .walking-eyebrow,
-.walking-countdown,
-.walking-points-label,
-.walking-growth-copy {
+.walking-countdown {
   text-transform: uppercase;
   letter-spacing: 0.16em;
   font:
     11px "DM Mono",
     monospace;
 }
-.walking-intro,
-.walking-setup-note,
-.walking-note {
-  color: var(--muted);
-  line-height: 1.55;
-  max-width: 470px;
-  margin: 14px auto;
-}
-.walking-setup-note {
-  font-size: 12px;
-}
 .walking-settings {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin: 24px auto 8px;
+  margin: 22px auto 20px;
   max-width: 460px;
   text-align: left;
 }
@@ -56,19 +43,17 @@
   background: rgba(255, 255, 255, 0.5);
   color: var(--ink);
 }
+.walking-location-note { max-width: 430px; margin: 0 auto 18px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.walking-slow-note { color: var(--muted); font-size: 11px; margin: 8px auto 16px; }
 .walking-plant {
   display: block;
   width: min(75vw, 310px);
   height: auto;
   margin: 8px auto;
 }
-.walking-setup .walking-plant {
-  width: min(54vw, 220px);
-  margin: -58px auto -42px;
-}
 .walking-active .walking-plant {
-  width: min(64vw, 250px);
-  margin-block: -44px -20px;
+  width: min(58vw, 230px);
+  margin-block: -42px 0;
 }
 .plant-ground,
 .plant-stem,
@@ -99,84 +84,15 @@
   justify-content: space-between;
   gap: 12px;
 }
-.gps-chip {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 8px 11px;
-  font-size: 11px;
-  color: var(--muted);
-}
-.gps-chip::before { content: "●"; margin-right: 5px; }
-.gps-chip.connected {
-  color: #526c4c;
-  background: #eaf0e5;
-}
-.gps-chip.denied,
-.gps-chip.unavailable {
-  color: #85645c;
-}
-.walking-growth-copy {
-  margin-top: 8px;
-  color: var(--muted);
-}
-.walking-score-card {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  max-width: 430px;
-  margin: 24px auto 18px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 18px;
-}
-.walking-score-card > div + div {
-  border-left: 1px solid var(--line);
-}
-.walking-score-card strong {
-  display: block;
-  font: 500 44px Manrope, -apple-system, BlinkMacSystemFont, sans-serif;
-}
-.walking-score-card span {
-  font:
-    10px "DM Mono",
-    monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--muted);
-}
-.walking-score-card p,
-.walking-score-card small {
-  grid-column: 1/-1;
-  color: var(--muted);
-}
-.walking-score-card small {
-  border-top: 1px solid var(--line);
-  padding-top: 14px;
-}
 .walking-actions {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 12px;
   max-width: 430px;
-  margin: auto;
+  margin: 0 auto;
 }
 .walking-actions button {
   width: 100%;
-}
-.walking-location-message {
-  font-size: 12px;
-  color: #85645c;
-}
-.walking-points-total {
-  font: 500 clamp(70px, 20vw, 110px) Manrope, -apple-system, BlinkMacSystemFont, sans-serif;
-  line-height: 0.85;
-}
-.walking-badge {
-  display: inline-block;
-  background: #e8eee2;
-  color: #52664c;
-  padding: 8px 15px;
-  border-radius: 999px;
-  margin: 12px;
 }
 .walking-complete .walking-plant {
   margin-bottom: -4px;
@@ -188,13 +104,10 @@
 }
 @media (max-width: 480px) {
   .walking-view {
-    padding-inline: 16px;
+    padding: 0 4px 12px;
   }
   .walking-settings { grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px; }
   .walking-settings select { padding: 10px 8px; }
-  .walking-score-card {
-    padding-inline: 10px;
-  }
   .walking-actions {
     grid-template-columns: 1.6fr 1fr;
   }

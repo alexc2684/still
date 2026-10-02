@@ -4,6 +4,8 @@ import {
   haversineMeters,
   intervalCueDue,
   slowBonus,
+  walkingPlantProgress,
+  walkGrowthSeconds,
 } from "./walking";
 import { describe, expect, it } from "vitest";
 const fix = (northMeters: number, timestamp: number, accuracy = 5) => ({
@@ -13,6 +15,25 @@ const fix = (northMeters: number, timestamp: number, accuracy = 5) => ({
   timestamp,
 });
 describe("walking movement", () => {
+  it("always grows from elapsed time, caps slow-walk growth, and freezes with unchanged time", () => {
+    expect(walkingPlantProgress(600, 540, 0)).toBe(0.1);
+    expect(walkingPlantProgress(600, 540, 999)).toBe(0.12);
+    expect(walkingPlantProgress(600, 0, 999)).toBe(1);
+  });
+
+  it("gives reliably confirmed slow movement more plant growth than fast movement and none for stationary jitter", () => {
+    const base = Date.now(), at = (meters: number, seconds: number, accuracy = 1) => fix(meters, base + seconds * 1000, accuracy);
+    let slow = emptyWalkTrack();
+    for (const sample of [at(0, 0), at(4, 10), at(8, 20)]) slow = addWalkSample(slow, sample);
+    let fast = emptyWalkTrack();
+    for (const sample of [at(0, 0), at(15, 10), at(30, 20)]) fast = addWalkSample(fast, sample);
+    let still = emptyWalkTrack();
+    for (const sample of [at(0, 0, 8), at(2, 10, 8), at(-2, 20, 8)]) still = addWalkSample(still, sample);
+    expect(slow.movingSeconds).toBeGreaterThan(0);
+    expect(fast.movingSeconds).toBeGreaterThan(0);
+    expect(walkGrowthSeconds(slow)).toBeGreaterThan(walkGrowthSeconds(fast));
+    expect(walkGrowthSeconds(still)).toBe(0);
+  });
   it("calculates distance and clamps safe haversine inputs", () => {
     expect(haversineMeters(fix(0, 0), fix(100, 1))).toBeCloseTo(100, 0);
     expect(

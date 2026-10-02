@@ -22,6 +22,16 @@ export const emptyWalkTrack = (): WalkTrack => ({
   points: 0,
   lastSpeedMps: null,
 });
+
+export function walkGrowthSeconds(track: Pick<WalkTrack, "points" | "movingSeconds">) {
+  return Math.max(0, track.points * 6 - track.movingSeconds);
+}
+
+export function walkingPlantProgress(plannedSeconds: number, remainingSeconds: number, growthSeconds: number) {
+  const elapsed = Math.max(0, plannedSeconds - remainingSeconds);
+  const boost = Math.min(Math.max(0, growthSeconds), plannedSeconds * 0.15, elapsed * 0.2);
+  return Math.min(1, (elapsed + boost) / plannedSeconds);
+}
 export function haversineMeters(
   a: Pick<GeoSample, "latitude" | "longitude">,
   b: Pick<GeoSample, "latitude" | "longitude">,
