@@ -75,3 +75,21 @@ h2 { font-size: 19px; line-height: 1.2; letter-spacing: -.04em; font-weight: 600
 .reset-page { min-height: 100svh; display: grid; place-items: center; padding: 24px; }
 .reset-page > .auth-modal { width: min(100%, 440px); }
 .reset-page h1 { font-size: 28px; margin-top: 28px; }
+
+/* The solo sit is a stationary screen; journals and dialogs retain scrolling. */
+html:has(.sit-screen), body:has(.sit-screen) { overflow: hidden; overscroll-behavior: none; }
+.sit-screen { height: 100dvh; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.sit-screen .topbar { width: 100%; flex-shrink: 0; }
+.sit-screen .page-wrap { width: 100%; min-height: 0; flex: 1; padding-top: 16px; padding-bottom: 12px; overflow: hidden; }
+.sit-screen .timer-dial { width: min(70vw, 32dvh, 300px); }
+@media (max-height: 650px) {
+  .sit-screen .topbar { height: 44px; }
+  .sit-screen .page-wrap { padding-top: 6px; }
+  .sit-screen .practice-mode { margin-bottom: 8px; }
+  .sit-screen .sit-heading { margin-bottom: 8px; }
+  .sit-screen .timer-page-heading { font-size: 24px; }
+  .sit-screen .timer-dial { width: min(28dvh, 180px); margin: 6px auto 12px; }
+  .sit-screen .timer-dial-center strong { font-size: 34px; }
+  .sit-screen .practice-timer-card { padding-top: 6px; padding-bottom: 12px; }
+  .sit-screen .sound-preview { margin-bottom: 4px; }
+}

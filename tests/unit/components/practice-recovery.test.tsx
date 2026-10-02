@@ -13,7 +13,7 @@ describe('PracticeTimer recovery boundaries', () => {
   it('restores an unexpired active session without completing it', async () => {
     const now = Date.now(); localStorage.setItem('still:practice:recovery-user', JSON.stringify({ sessionId: 'active', startedAt: new Date(now - 1000).toISOString(), deadlineMs: now + 60_000, plannedSeconds: 60 }))
     render(<PracticeTimer user={user} />)
-    await waitFor(() => expect(screen.getByRole('button', { name: /End session early/ })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument())
     expect(vi.mocked(fetch)).not.toHaveBeenCalled()
   })
 
@@ -91,7 +91,7 @@ describe('PracticeTimer recovery boundaries', () => {
     vi.stubGlobal('navigator', {})
     const now = Date.now(); localStorage.setItem('still:practice:recovery-user', JSON.stringify({ sessionId: 'hidden-wake', startedAt: new Date(now - 1000).toISOString(), deadlineMs: now + 60_000, plannedSeconds: 60 }))
     render(<PracticeTimer user={user} />)
-    await waitFor(() => expect(screen.getByRole('button', { name: /End session early/ })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument())
   })
 
   it('uses generic completion and cancellation messages when error bodies are empty', async () => {
@@ -100,7 +100,7 @@ describe('PracticeTimer recovery boundaries', () => {
     render(<PracticeTimer user={user} />)
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Still could not save the completed session.'))
     cleanup(); localStorage.clear(); vi.mocked(fetch).mockReset(); vi.mocked(fetch).mockResolvedValueOnce(reply({ session: { id: 'cancel-generic', startedAt: new Date().toISOString(), plannedSeconds: 60 } })).mockResolvedValueOnce(reply({}, false))
-    const ui = userEvent.setup(); render(<PracticeTimer user={user} />); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('button', { name: /End session/ })).toBeInTheDocument()); await ui.click(screen.getByRole('button', { name: /End session/ })); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Could not end this practice.'))
+    const ui = userEvent.setup(); render(<PracticeTimer user={user} />); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()); await ui.click(screen.getByRole('button', { name: 'Pause' })); await ui.click(screen.getByRole('button', { name: /End session/ })); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Could not end this practice.'))
   })
 })
 

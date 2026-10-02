@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/components/PracticeTimer', () => ({ default: ({ onActiveChange, onSignIn, onSessionSaved }: { onActiveChange: (v: boolean) => void; onSignIn: () => void; onSessionSaved: () => void }) => <><button onClick={() => onActiveChange(true)}>Mock timer</button><button onClick={() => onActiveChange(false)}>Stop timer</button><button onClick={onSignIn}>Timer sign in</button><button onClick={onSessionSaved}>Timer saved</button></> }))
-vi.mock('@/components/WalkingMeditation', () => ({ default: ({ onActiveChange, onSignIn, onSessionSaved }: { onActiveChange: (v: boolean) => void; onSignIn: () => void; onSessionSaved: () => void }) => <><button onClick={() => onActiveChange(true)}>Mock walk</button><button onClick={() => onActiveChange(false)}>Stop walk</button><button onClick={onSignIn}>Walk sign in</button><button onClick={onSessionSaved}>Walk saved</button></> }))
 vi.mock('@/components/SharedSit', () => ({ default: ({ onActiveChange, onSignIn, onSessionSaved }: { onActiveChange: (v: boolean) => void; onSignIn: () => void; onSessionSaved: () => void }) => <><button onClick={() => onActiveChange(true)}>Mock shared sit</button><button onClick={onSignIn}>Shared sign in</button><button onClick={onSessionSaved}>Shared saved</button></> }))
 vi.mock('@/components/Journal', () => ({ default: ({ onSignIn, onChanged }: { onSignIn: () => void; onChanged: () => void }) => <><button onClick={onSignIn}>Journal sign in</button><button onClick={onChanged}>Journal changed</button></> }))
 vi.mock('@/components/Profile', () => ({ default: ({ onSignIn, onSignOut, onProfileUpdated }: { onSignIn: () => void; onSignOut: () => void; onProfileUpdated: (u: unknown) => void }) => <><button onClick={onSignIn}>Profile sign in</button><button onClick={onSignOut}>Profile sign out</button><button onClick={() => onProfileUpdated({ id: 'u', name: 'Updated', email: 'u', timezone: 'UTC' })}>Profile updated</button></> }))
@@ -27,7 +26,6 @@ describe('home shell', () => {
     await user.click(screen.getByRole('button', { name: 'Solo' })); expect(screen.getByRole('button', { name: 'Solo' })).toHaveAttribute('aria-pressed', 'true')
     await user.click(screen.getByRole('button', { name: /timer sign in/i })); await user.click(screen.getByRole('button', { name: 'Close sign in' }))
     await user.click(screen.getByText('Timer saved'))
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Practice' }), 'walk'); await user.click(screen.getByText('Walk saved')); await user.click(screen.getByText('Walk sign in')); await user.click(screen.getByRole('button', { name: 'Close sign in' })); await user.selectOptions(screen.getByRole('combobox', { name: 'Practice' }), 'sit')
     await user.click(screen.getByRole('button', { name: 'Together' })); await user.click(screen.getByText('Shared saved'))
     await user.click(screen.getByRole('button', { name: /circle/i })); expect(screen.getByText('Circle sign in')).toBeInTheDocument(); await user.click(screen.getByText('Circle sign in')); await user.click(screen.getByRole('button', { name: 'Close sign in' }))
     await user.click(screen.getByRole('button', { name: /journal/i })); expect(screen.getByText('Journal sign in')).toBeInTheDocument(); await user.click(screen.getByText('Journal sign in')); await user.click(screen.getByRole('button', { name: 'Close sign in' }))
@@ -63,13 +61,25 @@ describe('home shell', () => {
     vi.unstubAllGlobals();
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC' }).format(new Date()); const yesterdayDate = new Date(`${today}T12:00:00Z`); yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1); const yesterday = yesterdayDate.toISOString().slice(0, 10)
     vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/auth/me' ? response({ user: { id: 'u', name: 'Ada', email: 'a', timezone: 'UTC', weeklyTarget: 2 } }) : response({ practiceDates: [today, yesterday] })))
-    render(<Home />); await waitFor(() => expect(screen.getAllByText(/day streak/).length).toBeGreaterThan(0))
+    render(<Home />); await userEvent.click(screen.getAllByRole('button', { name: /journal/i }).at(-1)!); await waitFor(() => expect(screen.getAllByText(/day streak/).length).toBeGreaterThan(0))
     window.history.pushState({}, '', '/')
     vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/auth/me' ? response({ user: { id: 'u', name: 'Ada', email: 'a', timezone: 'UTC' } }) : response({}, false)))
     render(<Home />); await waitFor(() => expect(screen.getAllByRole('button', { name: 'Solo' }).length).toBeGreaterThan(0))
   })
-  it('routes walking activity state', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({}, false))); const user = userEvent.setup(); render(<Home />); const selector = await screen.findByRole('combobox', { name: 'Practice' }); expect(selector).toHaveValue('sit'); await user.selectOptions(selector, 'walk'); expect(selector).toHaveValue('walk'); await user.click(screen.getByText('Mock walk')); expect(selector).toBeDisabled(); expect(selector).toHaveValue('walk'); await user.selectOptions(selector, 'sit'); expect(selector).toHaveValue('walk'); await user.click(screen.getByText('Stop walk')); expect(selector).toBeEnabled(); await user.selectOptions(selector, 'sit'); await user.click(screen.getByText('Mock timer')); expect(selector).toBeDisabled(); expect(selector).toHaveValue('sit'); await user.click(screen.getByText('Stop timer')); expect(selector).toBeEnabled()
+  it('offers only sitting and confines the fixed layout to the solo practice screen', async () => {
+    window.history.pushState({}, '', '/')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({}, false)))
+    const user = userEvent.setup(); const view = render(<Home />)
+    expect(screen.queryByRole('combobox', { name: 'Practice' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Mock walk')).not.toBeInTheDocument()
+    expect(screen.queryByText(/days this Mon/)).not.toBeInTheDocument()
+    expect(view.container.querySelector('main')).toHaveClass('sit-screen')
+    await user.click(screen.getByRole('button', { name: /journal/i }))
+    expect(view.container.querySelector('main')).not.toHaveClass('sit-screen')
+    await user.click(screen.getByRole('button', { name: 'Still' }))
+    await user.click(screen.getByText('Mock timer')); await user.click(screen.getByText('Stop timer'))
+    await user.click(screen.getByRole('button', { name: 'Together' }))
+    expect(view.container.querySelector('main')).not.toHaveClass('sit-screen')
   })
 })
 

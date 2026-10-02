@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Journal from "@/components/Journal";
 import Profile from "@/components/Profile";
 import PracticeTimer from "@/components/PracticeTimer";
-import WalkingMeditation from "@/components/WalkingMeditation";
 import CircleView from "@/components/Circle";
 import AuthModal from "@/components/AuthModal";
 import Avatar from "@/components/Avatar";
@@ -25,12 +24,10 @@ export default function Home() {
     [user, setUser] = useState<User | null>(null),
     [dates, setDates] = useState<string[]>([]),
     [mode, setMode] = useState<"solo" | "together">("solo"),
-    [soloKind, setSoloKind] = useState<"sit" | "walk">("sit"),
     [inviteToken, setInviteToken] = useState<string>(),
     [sitActive, setSitActive] = useState(false),
-    [walkActive, setWalkActive] = useState(false),
     [sharedActive, setSharedActive] = useState(false),
-    soloActive = sitActive || walkActive;
+    soloActive = sitActive;
   const refresh = useCallback(async () => {
     const m = await fetch("/api/auth/me");
     if (!m.ok) {
@@ -45,14 +42,6 @@ export default function Home() {
       const x = await h.json();
       setDates([...new Set((x.practiceDates ?? []) as string[])]);
     }
-  }, []);
-  const handleSitActive = useCallback((active: boolean) => {
-    setSitActive(active);
-    if (active) setSoloKind("sit");
-  }, []);
-  const handleWalkActive = useCallback((active: boolean) => {
-    setWalkActive(active);
-    if (active) setSoloKind("walk");
   }, []);
   useEffect(() => {
     void refresh();
@@ -78,25 +67,16 @@ export default function Home() {
         c = d.toISOString().slice(0, 10);
       }
       return n;
-    }, [dates, today]),
-    weekly = useMemo(() => {
-      const d = new Date(`${today}T12:00:00`);
-      d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-      return dates.filter(
-        (x) =>
-          new Date(`${x}T12:00:00`) >= d &&
-          new Date(`${x}T12:00:00`) < new Date(d.getTime() + 7 * 86400000),
-      ).length;
     }, [dates, today]);
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${tab === "practice" && mode === "solo" ? "sit-screen" : ""}`}>
       <header className="topbar">
         <button className="brand" onClick={() => setTab("practice")}>
           <span className="brand-mark" />
           Still
         </button>
         <div className="topbar-actions">
-          {user && <span className="streak-pill">✦ {streak} day streak</span>}
+          {user && tab !== "practice" && <span className="streak-pill">✦ {streak} day streak</span>}
           <button className="avatar" onClick={() => setTab("profile")}>
             {user ? (
               <Avatar
@@ -140,44 +120,13 @@ export default function Home() {
           />
         </div>
         <div hidden={tab !== "practice" || mode !== "solo"}>
-          <div className="practice-kind">
-            <label htmlFor="practice-kind">Practice</label>
-            <div className="practice-select-wrap">
-              <select
-                id="practice-kind"
-                value={soloKind}
-                disabled={soloActive || sharedActive}
-                onChange={(event) => setSoloKind(event.target.value as "sit" | "walk")}
-              >
-                <option value="sit">Sit</option>
-                <option value="walk">Walk</option>
-              </select>
-            </div>
-          </div>
-          <div hidden={soloKind !== "sit"}>
-            <PracticeTimer
-              user={user}
-              disabled={sharedActive || walkActive}
-              onActiveChange={handleSitActive}
-              onSignIn={() => setAuth(true)}
-              onSessionSaved={refresh}
-            />
-          </div>
-          <div hidden={soloKind !== "walk"}>
-            <WalkingMeditation
-              user={user}
-              disabled={sharedActive || sitActive}
-              onActiveChange={handleWalkActive}
-              onSignIn={() => setAuth(true)}
-              onSessionSaved={refresh}
-            />
-          </div>
-          {user && !soloActive && !sharedActive && (
-            <div className="practice-stats">
-              {streak} day streak · {weekly}/{user.weeklyTarget ?? 7} practice
-              days this Mon–Sun
-            </div>
-          )}
+          <PracticeTimer
+            user={user}
+            disabled={sharedActive}
+            onActiveChange={setSitActive}
+            onSignIn={() => setAuth(true)}
+            onSessionSaved={refresh}
+          />
         </div>
         {tab === "circle" && (
           <CircleView
