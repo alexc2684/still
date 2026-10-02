@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useRef } from 'react'
+import { useRef } from 'react'
 import './timer-dial.css'
 
 export type TimerDialProps = {
@@ -20,7 +20,6 @@ function formatTime(seconds: number) { return `${Math.floor(seconds / 60).toStri
 export default function TimerDial({ durationMinutes, remainingSeconds, disabled = false, onDurationChange, phaseLabel, running = false }: TimerDialProps) {
   const dialRef = useRef<HTMLDivElement>(null)
   const pointerRef = useRef<{ id: number; angle: number; exactMinutes: number } | null>(null)
-  const inputId = useId()
   const total = durationMinutes * 60
   const selectedSeconds = durationMinutes * 60
   const firstProgress = running ? Math.max(0, Math.min(1, remainingSeconds / total)) : Math.min(1, selectedSeconds / 3600)
@@ -69,7 +68,6 @@ export default function TimerDial({ durationMinutes, remainingSeconds, disabled 
       <circle className="timer-dial-face" cx="140" cy="140" r="111" />
       <g className="timer-dial-ticks">{Array.from({ length: 60 }, (_, index) => <line key={index} x1="140" y1={index % 5 === 0 ? 39 : 35} x2="140" y2="30" transform={`rotate(${index * 6} 140 140)`} className={index % 5 === 0 ? 'major' : ''} />)}</g><circle className="timer-dial-track" cx="140" cy="140" r={RADIUS} /><circle key={running ? 'countdown' : 'duration'} className="timer-dial-progress" cx="140" cy="140" r={RADIUS} strokeDasharray={CIRCUMFERENCE} strokeDashoffset={CIRCUMFERENCE * (1 - firstProgress)} />{!running && durationMinutes > 60 && <circle className="timer-dial-progress timer-dial-progress-second" cx="140" cy="140" r="116" strokeDasharray={2 * Math.PI * 116} strokeDashoffset={2 * Math.PI * 116 * (1 - secondProgress)} />}{onDurationChange && <circle className="timer-dial-thumb" cx={thumbX} cy={thumbY} r="7" />}</svg>
     <div className="timer-dial-center"><strong>{formatTime(remainingSeconds)}</strong><span>{phaseLabel || (remainingSeconds === 0 ? 'well done' : 'remaining')}</span>{interactive && durationMinutes > 60 && <small>second revolution</small>}</div>
-    {onDurationChange && <div className="timer-dial-duration"><label htmlFor={inputId}>Duration</label><input id={inputId} type="number" min="1" max="120" step="1" value={durationMinutes} disabled={disabled} onChange={event => onDurationChange(clampMinutes(Number(event.target.value) || 1))} onPointerDown={event => event.stopPropagation()} /></div>}
     {interactive && <div className="timer-dial-slider" role="slider" tabIndex={0} aria-label="Duration in minutes" aria-valuemin={1} aria-valuemax={120} aria-valuenow={durationMinutes} aria-valuetext={`${durationMinutes} minutes`} onKeyDown={onKeyDown} />}
   </div>
 }

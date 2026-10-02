@@ -48,17 +48,16 @@ describe('TimerDial', () => {
     view.rerender(<TimerDial durationMinutes={120} remainingSeconds={7200} onDurationChange={vi.fn()} />)
     expect(document.querySelector('.timer-dial-progress-second')).not.toBeNull()
   })
-  it('formats time, clamps number input, handles keyboard bounds, and renders progress states', async () => {
+  it('formats time, offers only dial controls, handles keyboard bounds, and renders progress states', async () => {
     const change = vi.fn()
     const { rerender } = render(<TimerDial durationMinutes={10} remainingSeconds={65} onDurationChange={change} phaseLabel="minutes" />)
     expect(screen.getByText('01:05')).toBeInTheDocument()
-    const input = screen.getByLabelText('Duration')
-    await userEvent.clear(input); await userEvent.type(input, '0'); fireEvent.change(input, { target: { value: '0' } }); expect(change).toHaveBeenCalledWith(1)
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
     const slider = screen.getByRole('slider')
     fireEvent.keyDown(slider, { key: 'ArrowRight' }); fireEvent.keyDown(slider, { key: 'ArrowUp' }); fireEvent.keyDown(slider, { key: 'ArrowLeft' }); fireEvent.keyDown(slider, { key: 'ArrowDown' }); fireEvent.keyDown(slider, { key: 'Home' }); fireEvent.keyDown(slider, { key: 'End' })
     expect(change).toHaveBeenCalledWith(120); expect(change).toHaveBeenCalledWith(1)
     rerender(<TimerDial durationMinutes={1} remainingSeconds={0} running onDurationChange={change} />); expect(screen.getByText('00:00')).toBeInTheDocument(); expect(screen.getByText('well done')).toBeInTheDocument()
-    rerender(<TimerDial durationMinutes={120} remainingSeconds={600} disabled onDurationChange={change} />); expect(screen.queryByRole('slider')).not.toBeInTheDocument(); expect(screen.getByLabelText('Duration')).toBeDisabled()
+    rerender(<TimerDial durationMinutes={120} remainingSeconds={600} disabled onDurationChange={change} />); expect(screen.queryByRole('slider')).not.toBeInTheDocument(); expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
   })
   it('supports pointer drag on the rim, thumb, seam wrapping, and ignores inner/readonly input', () => {
     const change = vi.fn(); render(<TimerDial durationMinutes={10} remainingSeconds={300} onDurationChange={change} />)
@@ -246,7 +245,8 @@ it.each([1, 3, 10])('solo stays silent at start and rings once after %i minutes'
   vi.stubGlobal('fetch', fetcher)
   try {
     render(<PracticeTimer user={{ id: 'end-only-user', name: 'Ada' }} />)
-    fireEvent.change(screen.getByLabelText('Duration'), { target: { value: String(minutes) } })
+    fireEvent.keyDown(screen.getByRole('slider'), { key: 'Home' })
+    for (let i = 1; i < minutes; i++) fireEvent.keyDown(screen.getByRole('slider'), { key: 'ArrowUp' })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Begin practice/ })) })
     expect(bowlMock.unlockBowlAudio).toHaveBeenCalled(); expect(bowlMock.playBowl).not.toHaveBeenCalled()
     await act(async () => { await vi.advanceTimersByTimeAsync(minutes * 60000 - 1000) })
