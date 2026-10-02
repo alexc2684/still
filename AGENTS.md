@@ -18,3 +18,14 @@ configuration code with 100% statements, branches, functions, and lines per
 file. Do not add coverage-ignore pragmas or exclude runtime modules to make a
 threshold pass. Keep credentials, production data, and real push delivery out
 of tests; mock external services and use fixtures only.
+
+## UI copy
+
+Keep interface copy functional and minimal. Omit motivational filler, poetic
+taglines, and instructions that repeat what the controls already communicate.
+Use short labels and status text only when they help someone understand the
+current state or next action.
+
+For every new user-facing feature, capture and show screenshots of the
+implemented UI before calling it complete. Include key states and mobile when
+applicable; report any capture blocker instead of claiming visual verification.

@@ -40,6 +40,9 @@ describe("WalkingMeditation", () => {
     await ui.selectOptions(screen.getByLabelText("Duration"), "10");
     await ui.selectOptions(screen.getByLabelText("Interval bell"), "5");
     await ui.click(screen.getByRole("button", { name: /Begin walk/ }));
+    expect(screen.getByRole("heading", { name: "Walking meditation" })).toBeInTheDocument();
+    expect(screen.queryByText("Let your walk unfold")).not.toBeInTheDocument();
+    expect(screen.queryByText("Waiting for steady steps")).not.toBeInTheDocument();
     expect(bowl.unlockBowlAudio).toHaveBeenCalled(); expect(bowl.playBowl).toHaveBeenCalledWith(true);
     expect(navigator.geolocation.watchPosition).toHaveBeenCalled();
     success({ coords: { latitude: 40, longitude: -73, accuracy: 5 } as GeolocationCoordinates, timestamp: Date.now() } as GeolocationPosition);

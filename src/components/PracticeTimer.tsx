@@ -166,10 +166,9 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
     <div className="sit-heading">
       <div className="eyebrow">Sitting meditation</div>
       <h1 id="practice-heading" className="timer-page-heading">{timeOfDay}</h1>
-      <p>A little quieter. A little more present.</p>
     </div>
     <div className={`timer-card practice-timer-card ${active ? 'is-running' : ''} ${saved ? 'is-complete' : ''}`}>
-      <div className="timer-label">{active?.paused ? 'Take your time' : active ? 'Stay with the breath' : saved ? 'Practice complete' : 'Settle in'}</div>
+      {saved && <div className="timer-label">Practice complete</div>}
       <TimerDial durationMinutes={active ? Math.round(active.plannedSeconds / 60) : minutes} remainingSeconds={displayRemaining} running={Boolean(active)} disabled={Boolean(active || saved)} onDurationChange={active || saved ? undefined : setMinutes} phaseLabel={saved ? 'well done' : active?.paused ? 'paused' : active ? 'remaining' : 'minutes'} />
       {!active && !saved && <button className="sound-preview" type="button" onClick={() => { unlockBowlAudio(); playBowl() }}>Preview sound</button>}
       {active && <div className="timer-session-actions"><button className="secondary-button" onClick={active.paused ? resume : pause} disabled={busy}>{active.paused ? 'Resume' : 'Pause'}</button><button className="text-button" onClick={() => void cancel()} disabled={busy}>End session early</button></div>}

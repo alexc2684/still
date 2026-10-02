@@ -111,7 +111,8 @@ describe('PracticeTimer', () => {
   it('starts, persists, counts down, completes, opens reflection and saves it', async () => {
     vi.useRealTimers(); const ui = userEvent.setup()
     const now = Date.now(); fetchMock.mockResolvedValueOnce(response({ session: { id: 's1', startedAt: new Date(now - 2000).toISOString(), plannedSeconds: 1 } })).mockResolvedValueOnce(response({}));
-    render(<PracticeTimer user={user} />); expect(screen.getByRole('heading')).toHaveTextContent(/sit/); await ui.click(screen.getByRole('button', { name: /Begin practice/i }));
+    render(<PracticeTimer user={user} />); expect(screen.getByRole('heading')).toHaveTextContent(/sit/); expect(screen.queryByText('A little quieter. A little more present.')).not.toBeInTheDocument(); await ui.click(screen.getByRole('button', { name: /Begin practice/i }));
+    expect(screen.queryByText('Stay with the breath')).not.toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith('/api/sessions/start', expect.anything()); await waitFor(() => expect(screen.getByText('well done')).toBeInTheDocument()); expect(bowlMock.playBowl).toHaveBeenCalled()
     expect(screen.getByRole('button', { name: /Edit reflection/i })).toBeInTheDocument(); await ui.click(screen.getByRole('button', { name: /Edit reflection/i })); await ui.click(screen.getByRole('button', { name: 'Before 3 of 5' })); await ui.click(screen.getByRole('button', { name: 'During 4 of 5' })); await ui.click(screen.getByRole('button', { name: 'After 5 of 5' })); await ui.type(screen.getByRole('textbox'), 'quiet noticing'); fetchMock.mockResolvedValueOnce(response({})); await ui.click(screen.getByRole('button', { name: /Save reflection/i })); await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/sessions/s1/reflection', expect.objectContaining({ body: expect.stringContaining('quiet noticing') })))
   })

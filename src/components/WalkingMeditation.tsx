@@ -439,7 +439,7 @@ export default function WalkingMeditation({
     unhurried = averageBonus >= 1.2,
     pace = track.lastSpeedMps
       ? `${(track.lastSpeedMps * 3.6).toFixed(1)} km/h`
-      : "Waiting for steady steps";
+      : "—";
   if (complete)
     return (
       <section className="walking-view walking-complete">
@@ -558,7 +558,7 @@ export default function WalkingMeditation({
           <h1>
             {session.pausedRemainingSeconds
               ? "Your walk is paused"
-              : "Let your walk unfold"}
+              : "Walking meditation"}
           </h1>
           <WalkingPlant progress={1 - remaining / session.plannedSeconds} />
           <div className="walking-growth-copy">Your calm is growing</div>
