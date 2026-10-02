@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './journal.css'
 import { combineJournalNotes } from './journalNotes'
+import ReflectionSearch from './ReflectionSearch'
 
 type Mood = 1 | 2 | 3 | 4 | 5
 
@@ -134,6 +135,7 @@ export default function Journal({ signedIn = true, onSignIn, onChanged, refreshK
   return <section className="content-view" aria-labelledby="journal-heading">
     <div className="view-header"><div><div className="eyebrow">Your practice</div><h1 id="journal-heading">Journal</h1></div></div>
     {error && <p className="form-error" role="alert">{error} <button className="text-button" onClick={() => void load()}>Retry</button></p>}
+    <ReflectionSearch />
     <div className="journal-summary"><div><strong>{summary.totalSessions}</strong><span>Total sessions</span></div><div><strong>{summary.totalMinutes}</strong><span>Minutes practiced</span></div><div><strong>{currentStreak(practiceDates, today)}</strong><span>Current streak</span></div></div>
     <div className="month-head"><button aria-label="Previous month" onClick={() => setMonth(value => new Date(value.getFullYear(), value.getMonth() - 1, 1))}>←</button><strong>{monthTitle}</strong><button aria-label="Next month" onClick={() => setMonth(value => new Date(value.getFullYear(), value.getMonth() + 1, 1))}>→</button></div>
     <div className="calendar" aria-label={`${monthTitle} practice calendar`}>{dayLabels.map((day, index) => <span className="calendar-label" key={`${day}-${index}`}>{day}</span>)}{calendar.map((date, index) => date ? <button type="button" onClick={() => { setSelectedDate(localDate(date)); setEditing(null) }} aria-pressed={localDate(date) === (selectedDate ?? loadedDate)} key={localDate(date)} className={`${practiceDates.includes(localDate(date)) ? 'meditated ' : ''}${localDate(date) === today ? 'today' : ''}`} aria-label={localDate(date)}>{date.getDate()}</button> : <span aria-hidden="true" key={`blank-${index}`} />)}</div>
