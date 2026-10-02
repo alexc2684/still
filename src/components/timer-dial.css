@@ -1,12 +1,81 @@
-.timer-dial { width: min(76vw, 300px); aspect-ratio: 1; margin: 18px auto 58px; position: relative; touch-action: auto; }.timer-dial.is-interactive { touch-action: none; }
-.timer-dial svg { display: block; width: 100%; height: 100%; transform: rotate(0deg); }
-.timer-dial-track, .timer-dial-progress { fill: none; stroke-width: 8; }
-.timer-dial-track { stroke: #d9ded4; }.timer-dial-progress { stroke: var(--sage-dark); stroke-linecap: round; transition: stroke-dashoffset .3s linear; transform: rotate(-90deg); transform-origin: 140px 140px; }
-.timer-dial-thumb { fill: var(--sage-dark); stroke: var(--surface); stroke-width: 3; }
-.timer-dial-center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; }.timer-dial-center strong { font-size: clamp(48px, 9vw, 62px); letter-spacing: -.075em; line-height: 1; font-weight: 500; }.timer-dial-center span { color: var(--muted); font: 10px 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .16em; margin-top: 12px; }
-.timer-dial-duration { position: absolute; left: 50%; bottom: -38px; transform: translateX(-50%); display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; }.timer-dial-duration input { width: 43px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); font: 500 16px 'DM Mono', monospace; text-align: center; }.timer-dial-duration input::-webkit-inner-spin-button { appearance: none; }
-.timer-dial-slider { position: absolute; inset: 0; border-radius: 50%; outline: none; pointer-events: none; }.timer-dial-slider:focus-visible { outline: 3px solid rgba(100,130,105,.45); outline-offset: 6px; }
-@media (max-width: 600px) { .timer-dial { width: clamp(205px, min(68vw, 32svh), 260px); margin-top: 14px; margin-bottom: 52px; } }
-
-.timer-dial-progress-second { stroke: var(--sage); stroke-width: 5; }
-.timer-dial-center small { color: var(--muted); font: 9px 'DM Mono', monospace; margin-top: 6px; }
+.timer-dial {
+  width: min(76vw, 340px); aspect-ratio: 1; margin: 24px auto 76px;
+  position: relative; isolation: isolate; touch-action: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+.timer-dial.is-interactive { touch-action: none; cursor: grab; }
+.timer-dial.is-interactive:active { cursor: grabbing; }
+.timer-dial-aura {
+  position: absolute; inset: -9%; border-radius: 50%; z-index: -1; pointer-events: none;
+  background: radial-gradient(circle, rgba(151, 174, 142, .15) 30%, rgba(151, 174, 142, .07) 57%, transparent 71%);
+  opacity: .4; transform: scale(.96); transition: opacity 1.8s ease;
+}
+.timer-dial svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.timer-dial-face {
+  fill: #f9f8f3; stroke: rgba(255, 255, 255, .95); stroke-width: 1;
+  filter: drop-shadow(0 3px 3px rgba(62, 68, 49, .06));
+}
+.timer-dial-ticks { stroke: #c9cdc2; stroke-width: .7; stroke-linecap: round; transition: opacity 1.5s ease; }
+.timer-dial-ticks .major { stroke: #929e8b; stroke-width: 1; }
+.timer-dial-track, .timer-dial-progress { fill: none; stroke-width: 3; }
+.timer-dial-track { stroke: #e0e4da; }
+.timer-dial-progress {
+  stroke: #647f64; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 140px 140px;
+  transition: stroke-dashoffset .32s cubic-bezier(.22, 1, .36, 1);
+  filter: drop-shadow(0 1px 2px rgba(79, 108, 75, .12));
+}
+.timer-dial.is-interactive:active .timer-dial-progress { transition: none; }
+.timer-dial-thumb {
+  fill: #f7f8f1; stroke: #647f64; stroke-width: 3;
+  filter: drop-shadow(0 2px 3px rgba(47, 66, 43, .23));
+  transition: stroke-width .2s ease, filter .2s ease;
+}
+.timer-dial.is-interactive:hover .timer-dial-thumb,
+.timer-dial.is-interactive:active .timer-dial-thumb { stroke-width: 4; filter: drop-shadow(0 2px 5px rgba(47, 66, 43, .3)); }
+.timer-dial-center {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  flex-direction: column; pointer-events: none;
+}
+.timer-dial-center strong {
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  font-size: clamp(48px, 9vw, 70px); font-weight: 300; font-variant-numeric: tabular-nums;
+  letter-spacing: -.055em; line-height: 1; color: #343e32;
+}
+.timer-dial-center span { color: #77816f; font: 10px 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .2em; margin-top: 14px; }
+.timer-dial-center small { color: var(--muted); font: 9px 'DM Mono', monospace; margin-top: 8px; }
+.timer-dial-duration {
+  position: absolute; left: 50%; bottom: -53px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 11px;
+  padding: 7px 13px; border-radius: 24px; border: 1px solid #dfe3d8; background: rgba(255,255,255,.45);
+  cursor: default; white-space: nowrap;
+}
+.timer-dial-duration input {
+  width: 43px; border: 0; border-bottom: 1px solid #b6c2ae; border-radius: 0;
+  background: transparent; color: #3e553d; font: 500 15px 'DM Mono', monospace; text-align: center;
+}
+.timer-dial-duration input::-webkit-inner-spin-button { appearance: none; }
+.timer-dial-slider { position: absolute; inset: 0; border-radius: 50%; outline: none; pointer-events: none; }
+.timer-dial-slider:focus-visible { outline: 2px solid #718768; outline-offset: 8px; }
+.timer-dial-progress-second { stroke: var(--sage); stroke-width: 2; }
+.timer-dial[data-running="true"] .timer-dial-aura { animation: dial-breathe 10s ease-in-out infinite; }
+.timer-dial[data-running="true"] .timer-dial-progress { transition: stroke-dashoffset 1s linear; }
+.timer-dial[data-running="true"] .timer-dial-ticks { opacity: .45; }
+.timer-dial[data-phase="paused"] .timer-dial-aura { animation-play-state: paused; opacity: .3; }
+.timer-dial[data-phase="well done"] .timer-dial-aura { opacity: .8; transform: scale(1.06); }
+@keyframes dial-breathe { 0%, 100% { transform: scale(.94); opacity: .35; } 50% { transform: scale(1.06); opacity: .85; } }
+@media (max-width: 600px) {
+  .timer-dial { width: clamp(205px, min(72vw, 35svh), 290px); margin-top: 18px; margin-bottom: 68px; }
+  .timer-dial-center strong { font-size: clamp(46px, 12vw, 60px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .timer-dial *, .timer-dial[data-running="true"] .timer-dial-progress { animation: none !important; transition: none !important; }
+}
+@media (max-width: 600px) {
+  .timer-dial { width: clamp(205px, min(70vw, 32svh), 270px); margin-top: 14px; margin-bottom: 62px; }
+}
+@media (max-width: 600px) and (max-height: 740px) {
+  .timer-dial { width: 180px; margin-top: 8px; margin-bottom: 48px; }
+  .timer-dial-duration { bottom: -42px; padding: 4px 10px; }
+  .timer-dial-center strong { font-size: 40px; }
+  .timer-dial-center span { font-size: 8px; margin-top: 10px; }
+}
