@@ -10,14 +10,6 @@ account, open the link, and choose **Join**. The host starts the sit when ready;
 each participant receives a private reflection afterward. The invitation link
 joins a shared session and is not a passwordless authentication mechanism.
 
-## Reflection search
-
-In Journal, use **Find a moment** to search words or phrases across your private
-reflections, including older before/during/after notes. Results show the most
-recent 50 matches with practice dates and durations; narrow the phrase if more
-matches exist. Only your completed sessions are searched. Search terms are sent
-in a request body rather than a URL, and results are not cached.
-
 ## Local setup
 
 Install dependencies and copy the Vercel-provided environment file:

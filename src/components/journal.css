@@ -35,13 +35,3 @@
 .calendar button[aria-pressed="true"] { background: var(--sage-dark); color: white; }
 .calendar button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .journal-day-heading { font-size: 16px; margin-top: 28px; }
-
-.reflection-search { margin: 24px 0; padding: 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
-.reflection-search h2 { margin: 0; font-size: 18px; }
-.reflection-search > p, .reflection-search [role="status"], .reflection-search-results span { color: var(--muted); font-size: 12px; line-height: 1.6; }
-.reflection-search label { display: block; margin: 16px 0 8px; font-size: 12px; }
-.reflection-search-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.reflection-search input { flex: 1 1 200px; min-width: 0; width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: inherit; font-size: 14px; }
-.reflection-search input:focus-visible { outline: 2px solid var(--sage-dark); outline-offset: 2px; }
-.reflection-search-results { max-height: 480px; overflow-y: auto; overflow-wrap: anywhere; }
-.reflection-search-results h3 { font-size: 14px; margin: 0 0 6px; }
