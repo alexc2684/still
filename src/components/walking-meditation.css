@@ -68,7 +68,7 @@
 }
 .walking-active .walking-plant {
   width: min(64vw, 250px);
-  margin-block: -44px -34px;
+  margin-block: -44px -20px;
 }
 .plant-ground,
 .plant-stem,
@@ -116,7 +116,7 @@
   color: #85645c;
 }
 .walking-growth-copy {
-  margin-top: -10px;
+  margin-top: 8px;
   color: var(--muted);
 }
 .walking-score-card {

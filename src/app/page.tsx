@@ -140,24 +140,20 @@ export default function Home() {
           />
         </div>
         <div hidden={tab !== "practice" || mode !== "solo"}>
-          {!soloActive && (
-            <div className="practice-mode practice-kind">
-              <button
-                className={soloKind === "sit" ? "selected" : ""}
-                aria-pressed={soloKind === "sit"}
-                onClick={() => setSoloKind("sit")}
+          <div className="practice-kind">
+            <label htmlFor="practice-kind">Practice</label>
+            <div className="practice-select-wrap">
+              <select
+                id="practice-kind"
+                value={soloKind}
+                disabled={soloActive || sharedActive}
+                onChange={(event) => setSoloKind(event.target.value as "sit" | "walk")}
               >
-                Sit
-              </button>
-              <button
-                className={soloKind === "walk" ? "selected" : ""}
-                aria-pressed={soloKind === "walk"}
-                onClick={() => setSoloKind("walk")}
-              >
-                Walk
-              </button>
+                <option value="sit">Sit</option>
+                <option value="walk">Walk</option>
+              </select>
             </div>
-          )}
+          </div>
           <div hidden={soloKind !== "sit"}>
             <PracticeTimer
               user={user}

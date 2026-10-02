@@ -4,9 +4,9 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: var(--paper); color: var(--ink); }
 body { font-family: Manrope, -apple-system, BlinkMacSystemFont, sans-serif; font-size: 14px; letter-spacing: -.01em; }
-button, input, textarea { font: inherit; }
+button, input, select, textarea { font: inherit; }
 button { color: inherit; border: 0; cursor: pointer; }
-button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid rgba(100,130,105,.45); outline-offset: 3px; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid rgba(100,130,105,.45); outline-offset: 3px; }
 .app-shell { min-height: 100svh; padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
 .topbar { height: 76px; display: flex; align-items: center; justify-content: space-between; max-width: 1160px; margin: auto; padding: 0 32px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 600; letter-spacing: -.05em; background: transparent; padding: 4px 0; }
@@ -63,6 +63,14 @@ h2 { font-size: 19px; line-height: 1.2; letter-spacing: -.04em; font-weight: 600
 .bottom-nav { height: calc(72px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); }
 .auth-modal input, .comment-form input { font-size: 16px; }
 .practice-mode { display:flex; gap:7px; margin: 0 auto 12px; max-width: 760px; }.practice-mode button { min-height:44px; flex:1; border:1px solid var(--line); border-radius:7px; background:transparent; color:var(--muted); }.practice-mode button.selected { background:var(--ink); color:#fff; border-color:var(--ink); }
+.practice-kind { display:flex; align-items:center; justify-content:flex-end; gap:10px; margin:0 auto 18px; max-width:760px; }
+.practice-kind label { color:var(--muted); font:500 10px 'DM Mono', monospace; letter-spacing:.12em; text-transform:uppercase; }
+.practice-select-wrap { position:relative; }
+.practice-select-wrap::after { content:'⌄'; position:absolute; right:13px; top:50%; transform:translateY(-56%); color:var(--sage-dark); pointer-events:none; font-size:16px; }
+.practice-kind select { min-width:132px; min-height:44px; appearance:none; border:1px solid var(--line); border-radius:999px; background:var(--surface); color:var(--ink); padding:0 40px 0 17px; font-size:12px; font-weight:600; cursor:pointer; box-shadow:0 5px 18px rgba(58,62,52,.035); }
+.practice-kind select:disabled { color:var(--muted); cursor:not-allowed; opacity:.72; }
+.practice-stats { max-width:760px; margin:14px auto 0; color:var(--muted); font-size:11px; text-align:center; line-height:1.5; }
+@media (max-width:600px) { .practice-kind { margin-bottom:14px; } .practice-kind select { min-width:124px; } .practice-stats { margin:14px auto 72px; } }
 
 .reset-page { min-height: 100svh; display: grid; place-items: center; padding: 24px; }
 .reset-page > .auth-modal { width: min(100%, 440px); }

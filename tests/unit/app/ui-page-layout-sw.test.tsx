@@ -27,7 +27,7 @@ describe('home shell', () => {
     await user.click(screen.getByRole('button', { name: 'Solo' })); expect(screen.getByRole('button', { name: 'Solo' })).toHaveAttribute('aria-pressed', 'true')
     await user.click(screen.getByRole('button', { name: /timer sign in/i })); await user.click(screen.getByRole('button', { name: 'Close sign in' }))
     await user.click(screen.getByText('Timer saved'))
-    await user.click(screen.getByRole('button', { name: 'Walk' })); await user.click(screen.getByText('Walk saved')); await user.click(screen.getByText('Walk sign in')); await user.click(screen.getByRole('button', { name: 'Close sign in' })); await user.click(screen.getByRole('button', { name: 'Sit' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Practice' }), 'walk'); await user.click(screen.getByText('Walk saved')); await user.click(screen.getByText('Walk sign in')); await user.click(screen.getByRole('button', { name: 'Close sign in' })); await user.selectOptions(screen.getByRole('combobox', { name: 'Practice' }), 'sit')
     await user.click(screen.getByRole('button', { name: 'Together' })); await user.click(screen.getByText('Shared saved'))
     await user.click(screen.getByRole('button', { name: /circle/i })); expect(screen.getByText('Circle sign in')).toBeInTheDocument(); await user.click(screen.getByText('Circle sign in')); await user.click(screen.getByRole('button', { name: 'Close sign in' }))
     await user.click(screen.getByRole('button', { name: /journal/i })); expect(screen.getByText('Journal sign in')).toBeInTheDocument(); await user.click(screen.getByText('Journal sign in')); await user.click(screen.getByRole('button', { name: 'Close sign in' }))
@@ -69,7 +69,7 @@ describe('home shell', () => {
     render(<Home />); await waitFor(() => expect(screen.getAllByRole('button', { name: 'Solo' }).length).toBeGreaterThan(0))
   })
   it('routes walking activity state', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({}, false))); const user = userEvent.setup(); render(<Home />); await waitFor(() => expect(screen.getByRole('button', { name: 'Walk' })).toBeInTheDocument()); await user.click(screen.getByRole('button', { name: 'Walk' })); await user.click(screen.getByText('Mock walk')); expect(screen.queryByRole('button', { name: 'Sit' })).not.toBeInTheDocument(); await user.click(screen.getByText('Stop walk')); expect(screen.getByRole('button', { name: 'Sit' })).toBeInTheDocument(); await user.click(screen.getByRole('button', { name: 'Sit' })); await user.click(screen.getByText('Mock timer')); await user.click(screen.getByText('Stop timer'))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({}, false))); const user = userEvent.setup(); render(<Home />); const selector = await screen.findByRole('combobox', { name: 'Practice' }); expect(selector).toHaveValue('sit'); await user.selectOptions(selector, 'walk'); expect(selector).toHaveValue('walk'); await user.click(screen.getByText('Mock walk')); expect(selector).toBeDisabled(); expect(selector).toHaveValue('walk'); await user.selectOptions(selector, 'sit'); expect(selector).toHaveValue('walk'); await user.click(screen.getByText('Stop walk')); expect(selector).toBeEnabled(); await user.selectOptions(selector, 'sit'); await user.click(screen.getByText('Mock timer')); expect(selector).toBeDisabled(); expect(selector).toHaveValue('sit'); await user.click(screen.getByText('Stop timer')); expect(selector).toBeEnabled()
   })
 })
 

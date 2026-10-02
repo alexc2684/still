@@ -10,7 +10,8 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); window.history.re
 
 it('selects dates, replaces reflections, handles an empty day and keeps lifetime totals', async () => {
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC' }).format(new Date())
-  const day = `${today.slice(0, 7)}-01`, empty = `${today.slice(0, 7)}-${today.endsWith('-02') ? '03' : '02'}`
+  const availableDays = ['01', '02', '03'].filter(value => value !== today.slice(8, 10))
+  const day = `${today.slice(0, 7)}-${availableDays[0]}`, empty = `${today.slice(0, 7)}-${availableDays[1]}`
   const fetcher = vi.fn(async (url: string) => {
     if (url === '/api/auth/me') return response({ user: { timezone: 'UTC' } })
     const date = url.endsWith('today') ? today : url.split('=')[1]
