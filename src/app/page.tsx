@@ -69,7 +69,7 @@ export default function Home() {
       return n;
     }, [dates, today]);
   return (
-    <main className={`app-shell ${tab === "practice" && mode === "solo" ? "sit-screen" : ""}`}>
+    <main className={`app-shell ${tab === "practice" ? "practice-screen" : ""} ${tab === "practice" && mode === "solo" ? "sit-screen" : ""}`}>
       <header className="topbar">
         <button className="brand" onClick={() => setTab("practice")}>
           <span className="brand-mark" />
