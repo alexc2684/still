@@ -29,3 +29,6 @@ CREATE TABLE IF NOT EXISTS reminder_delivery_ledger (id uuid PRIMARY KEY DEFAULT
 CREATE INDEX IF NOT EXISTS reminder_ledger_due ON reminder_delivery_ledger(status, claimed_at);
 CREATE TABLE IF NOT EXISTS password_reset_tokens (token_hash text PRIMARY KEY, user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE, password_hash_snapshot text NOT NULL, expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS password_reset_tokens_user ON password_reset_tokens(user_id);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub text UNIQUE;
+CREATE TABLE IF NOT EXISTS google_login_requests (state_hash text PRIMARY KEY, nonce text NOT NULL, verifier text NOT NULL, return_to text NOT NULL, timezone text NOT NULL, expires_at timestamptz NOT NULL);
+CREATE INDEX IF NOT EXISTS google_login_requests_expiry ON google_login_requests(expires_at);

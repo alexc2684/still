@@ -105,3 +105,12 @@ describe('layout and service worker', () => {
     expect(() => render(<ServiceWorker />)).not.toThrow()
   })
 })
+
+it('opens sign-in on a Google callback failure and removes the error marker while preserving invites',async()=>{
+ window.history.pushState({},'', '/?sit=invite&google_error=1')
+ vi.stubGlobal('fetch',vi.fn().mockResolvedValue(response({},false)))
+ render(<Home />)
+ await screen.findByText('Google sign-in could not finish. Please try again or sign in with email.')
+ expect(window.location.search).toBe('?sit=invite')
+ window.history.replaceState({},'','/')
+})
