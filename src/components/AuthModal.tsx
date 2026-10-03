@@ -4,15 +4,15 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
 
 export type AuthUser = { id: string; name: string; email: string; timezone: string; weeklyTarget?: number }
-export type AuthModalProps = { onClose: () => void; onSuccess: (user: AuthUser) => void }
+export type AuthModalProps = { onClose: () => void; onSuccess: (user: AuthUser) => void; initialError?: string }
 
-export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
+export default function AuthModal({ onClose, onSuccess, initialError = '' }: AuthModalProps) {
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [pending, setPending] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(initialError)
   const [message, setMessage] = useState('')
   const dialogRef = useRef<HTMLDivElement>(null)
   const firstFieldRef = useRef<HTMLInputElement>(null)
@@ -49,6 +49,17 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
     } finally { setPending(false) }
   }
 
+  async function googleSignIn() {
+    setPending(true); setError(''); setMessage('')
+    try {
+      const response = await fetch('/api/auth/google/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, returnTo: window.location.pathname + window.location.search }) })
+      const body = await response.json() as { url?: string; error?: string }
+      if (!response.ok || !body.url) throw new Error(body.error || 'Unable to start Google sign-in.')
+      window.location.assign(body.url)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to reach Google sign-in. Try again.') }
+    finally { setPending(false) }
+  }
+
   function switchMode(event: ReactKeyboardEvent<HTMLButtonElement>) {
     if (event.key === ' ') event.preventDefault()
   }
@@ -59,6 +70,7 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
       <div className="brand"><span className="brand-mark" />Still</div>
       <h2 id="still-auth-title">{mode === 'forgot' ? 'Reset your password.' : mode === 'signup' ? 'Begin a practice.' : 'Come sit with us.'}</h2>
       <p>{mode === 'forgot' ? 'Enter your email and we’ll send you a reset link.' : mode === 'signup' ? 'Make a little room for showing up.' : 'Sign in to keep your practice and find your circle.'}</p>
+      {mode !== 'forgot' && <><button type="button" className="google-sign-in" disabled={pending} onClick={() => void googleSignIn()}>Continue with Google</button><div className="auth-divider"><span>or use email</span></div></>}
       <form onSubmit={submit} noValidate>
         {mode === 'signup' && <label>Name<input ref={firstFieldRef} name="name" autoComplete="name" required minLength={1} maxLength={80} value={name} onChange={event => setName(event.target.value)} placeholder="Your name" /></label>}
         {mode !== 'signup' && <label>Email<input ref={firstFieldRef} name="email" type="email" autoComplete="email" required maxLength={254} value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" /></label>}

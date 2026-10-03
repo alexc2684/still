@@ -21,6 +21,7 @@ const dateKey = (d: Date, tz: string) =>
 export default function Home() {
   const [tab, setTab] = useState<Tab>("practice"),
     [auth, setAuth] = useState(false),
+    [authError, setAuthError] = useState(''),
     [user, setUser] = useState<User | null>(null),
     [dates, setDates] = useState<string[]>([]),
     [mode, setMode] = useState<"solo" | "together">("solo"),
@@ -45,6 +46,10 @@ export default function Home() {
   }, []);
   useEffect(() => {
     void refresh();
+    if (new URLSearchParams(window.location.search).has('google_error')) {
+      setAuthError('Google sign-in could not finish. Please try again or sign in with email.'); setAuth(true);
+      const url = new URL(window.location.href); url.searchParams.delete('google_error'); window.history.replaceState({}, '', url.pathname + url.search);
+    }
     const token =
       new URLSearchParams(window.location.search).get("sit") ?? undefined;
     setInviteToken(token);
@@ -176,6 +181,7 @@ export default function Home() {
       </nav>
       {auth && (
         <AuthModal
+          initialError={authError}
           onClose={() => setAuth(false)}
           onSuccess={(u) => {
             setUser(u);

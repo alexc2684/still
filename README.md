@@ -70,3 +70,29 @@ with the canonical app origin, `RESEND_API_KEY` with a Resend sending key, and
 Missing configuration produces a temporary-unavailability message; reset links
 are never returned by the API or logged. Links expire after 30 minutes. A
 successful reset invalidates all outstanding links and existing login sessions.
+
+## Google sign-in
+
+Google sign-in and sign-up use the same **Continue with Google** button. Existing
+Google accounts are identified by their immutable Google subject. Verified Gmail
+and Google Workspace emails can reuse an existing Still account without losing
+sessions or reflections. An external email already used by a password account is
+not automatically linked; use its existing email/password login.
+
+Before enabling Google in production:
+
+1. Create a **Web application** OAuth client in Google Cloud, with the consent
+   screen configured for Still and the `openid`, `email`, and `profile` scopes.
+2. Authorize the exact redirect URI
+   `https://still-meditation-ashen.vercel.app/api/auth/google/callback`.
+3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and the canonical `APP_URL` in
+   Vercel's production environment. Keep the secret server-side.
+4. Run `npm run db:migrate` against Still's production database before enabling
+   the credentials, then redeploy and exercise both a new and existing account.
+
+For local testing, use `APP_URL=http://localhost:3217` and authorize the matching
+`http://localhost:3217/api/auth/google/callback` URI in Google Cloud. An incomplete
+configuration returns a friendly unavailability message and retains email login.
+OAuth attempts expire after ten minutes and use a browser-bound state cookie,
+PKCE, nonce verification, and one-time server-side consumption. Provider access
+and refresh tokens are not stored.
