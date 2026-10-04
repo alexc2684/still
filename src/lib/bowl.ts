@@ -3,6 +3,14 @@
 let context: AudioContext | null = null
 let bowlUntil = 0
 
+function requestPlaybackSession() {
+  if (typeof navigator === 'undefined') return
+  try {
+    const audioSession = (navigator as Navigator & { audioSession?: { type: string } }).audioSession
+    if (audioSession) audioSession.type = 'playback'
+  } catch { /* optional WebKit extension can reject */ }
+}
+
 function getContext() {
   if (typeof window === 'undefined') return null
   if (!context) {
@@ -14,9 +22,10 @@ function getContext() {
 
 /** Call from the same user gesture as the host action on iOS/Safari. */
 export function unlockBowlAudio() {
+  requestPlaybackSession()
   const ctx = getContext()
   if (!ctx) return
-  void ctx.resume()
+  try { void Promise.resolve(ctx.resume()).catch(() => undefined) } catch { /* optional */ }
   try {
     const oscillator = ctx.createOscillator(), gain = ctx.createGain()
     gain.gain.value = 0.00001
@@ -25,11 +34,12 @@ export function unlockBowlAudio() {
 }
 
 /** Play one restrained singing-bowl strike. Calls are throttled while it rings. */
-export function playBowl() {
+export function playBowl(force = false) {
+  requestPlaybackSession()
   const ctx = getContext()
   if (!ctx) return
   const nowWall = typeof performance === 'undefined' ? Date.now() : performance.now()
-  if (nowWall < bowlUntil) return
+  if (!force && nowWall < bowlUntil) return
   bowlUntil = nowWall + 9000
   try {
     const now = ctx.currentTime, master = ctx.createGain()

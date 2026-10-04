@@ -4,14 +4,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import Journal from '../../../src/components/Journal'
 import Circle from '../../../src/components/Circle'
 
-const response = (value: unknown, ok = true, status = ok ? 200 : 500) => ({ ok, status, json: async () => value })
+const response = (value: unknown, ok = true, status = ok ? 200 : 500) => ({ ok, status, json: async () => {
+  const body = value as any
+  return { date: '2026-09-20', summary: { totalSessions: body.sessions?.filter((s: any) => s.completedAt).length ?? 0, totalMinutes: Math.round((body.sessions ?? []).reduce((n: number, s: any) => n + (s.elapsedSeconds || s.plannedSeconds), 0) / 60) }, ...body }
+} })
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 describe('Journal', () => {
   const session = { id: 's1', startedAt: '2026-09-20T10:00:00Z', completedAt: '2026-09-20T10:20:00Z', plannedSeconds: 1200, elapsedSeconds: 1200, beforeMood: 2, afterMood: 4, afterNote: 'Felt clear' }
   function mockJournal(ok = true) {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      if (url === '/api/sessions') return response(ok ? { sessions: [session], practiceDates: ['2026-09-20', '2026-09-19'] } : {}, ok)
+      if (url.startsWith('/api/sessions?')) return response(ok ? { sessions: [session], practiceDates: ['2026-09-20', '2026-09-19'] } : {}, ok)
       if (url === '/api/auth/me') return response({ user: { timezone: 'UTC' } })
       if (url.includes('/reflection')) return response({})
       return response({})
@@ -41,11 +44,11 @@ describe('Journal', () => {
 
   it('handles unauthorized loading, canceled deletes, save failures, and empty completed history', async () => {
     const user = userEvent.setup(); const signIn = vi.fn()
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/sessions' ? response({}, true, 401) : response({ user: { timezone: 'UTC' } })))
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => url.startsWith('/api/sessions?') ? response({}, true, 401) : response({ user: { timezone: 'UTC' } })))
     render(<Journal onSignIn={signIn} />); await waitFor(() => expect(screen.getByText('Keep your practice close.')).toBeInTheDocument()); await user.click(screen.getByRole('button', { name: /sign in to still/i })); expect(signIn).toHaveBeenCalled()
     const completed = { ...session, beforeMood: null, duringMood: null, afterMood: null, beforeNote: null, duringNote: null, afterNote: null }
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
-      if (url === '/api/sessions') return response({ sessions: [completed], practiceDates: [] })
+      if (url.startsWith('/api/sessions?')) return response({ sessions: [completed], practiceDates: [] })
       if (url === '/api/auth/me') return response({ user: { timezone: 'UTC' } })
       if (url.includes('/reflection')) return response({ error: 'Reflection rejected' }, false)
       if (init?.method === 'DELETE') return response({}, false)
@@ -58,14 +61,14 @@ describe('Journal', () => {
   })
 
   it('renders an empty journal when no sessions have completed', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/sessions' ? response({ sessions: [{ ...session, completedAt: null }], practiceDates: [] }) : response({ user: { timezone: 'UTC' } })))
-    render(<Journal />); await waitFor(() => expect(screen.getByText('Your journal begins here.')).toBeInTheDocument())
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => url.startsWith('/api/sessions?') ? response({ sessions: [{ ...session, completedAt: null }], practiceDates: [] }) : response({ user: { timezone: 'UTC' } })))
+    render(<Journal />); await waitFor(() => expect(screen.getByText('No practice recorded for this day.')).toBeInTheDocument())
   })
 
   it('uses response fallbacks for malformed reflection JSON and optional session fields', async () => {
     const user = userEvent.setup(); const fallback = { ...session, completedAt: '2026-09-20T10:20:00Z', elapsedSeconds: null, beforeMood: null, duringMood: null, afterMood: null, beforeNote: null, duringNote: null, afterNote: null }
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      if (url === '/api/sessions') return response({ sessions: [fallback], practiceDates: [] })
+      if (url.startsWith('/api/sessions?')) return response({ sessions: [fallback], practiceDates: [] })
       if (url === '/api/auth/me') return response({}, false)
       return { ok: false, json: async () => { throw new Error('bad json') } }
     }))
@@ -76,7 +79,7 @@ describe('Journal', () => {
   it('accepts a successful reflection whose response JSON is malformed', async () => {
     const user = userEvent.setup(); const item = { ...session, beforeMood: null, duringMood: null, afterMood: null, beforeNote: null, duringNote: null, afterNote: null }
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
-      if (url === '/api/sessions') return response({ sessions: [item], practiceDates: [] })
+      if (url.startsWith('/api/sessions?')) return response({ sessions: [item], practiceDates: [] })
       if (url === '/api/auth/me') return response({ user: { timezone: 'UTC' } })
       if (init?.method === 'PATCH') return { ok: true, json: async () => { throw new Error('bad json') } }
       return response({})
@@ -87,7 +90,7 @@ describe('Journal', () => {
   it('accepts missing optional load fields and leaves unrelated entries unchanged', async () => {
     const user = userEvent.setup(); const first = { ...session, beforeMood: null, duringMood: null, afterMood: null, beforeNote: null, duringNote: null, afterNote: null }; const second = { ...first, id: 's2' }
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
-      if (url === '/api/sessions') return response({ sessions: [first, second] })
+      if (url.startsWith('/api/sessions?')) return response({ sessions: [first, second] })
       if (url === '/api/auth/me') return response({}, false)
       if (init?.method === 'PATCH') return response({})
       return response({})
@@ -98,7 +101,7 @@ describe('Journal', () => {
   it('covers current-day streaks and non-Error load/update failures', async () => {
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC' }).format(new Date()); const user = userEvent.setup()
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
-      if (url === '/api/sessions') return response({ sessions: [{ ...session, beforeMood: null, duringMood: null, afterMood: null, beforeNote: null, duringNote: null, afterNote: null }], practiceDates: [today] })
+      if (url.startsWith('/api/sessions?')) return response({ sessions: [{ ...session, beforeMood: null, duringMood: null, afterMood: null, beforeNote: null, duringNote: null, afterNote: null }], practiceDates: [today] })
       if (url === '/api/auth/me') return response({}, false)
       if (init?.method === 'PATCH') throw 'offline'
       return response({})
@@ -107,13 +110,13 @@ describe('Journal', () => {
   })
 
   it('handles a missing session payload and non-Error load rejection', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => { if (url === '/api/sessions') return response({}); throw 'offline' }))
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => { if (url.startsWith('/api/sessions?')) return response({}); throw 'offline' }))
     render(<Journal />); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Unable to load your journal.'))
   })
 
   it('falls back when session arrays and profile timezone are null', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/sessions' ? response({ sessions: null, practiceDates: null }) : response({ user: { timezone: '' } })))
-    render(<Journal />); await waitFor(() => expect(screen.getByText('Your journal begins here.')).toBeInTheDocument())
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => url.startsWith('/api/sessions?') ? response({ sessions: null, practiceDates: null }) : response({ user: { timezone: '' } })))
+    render(<Journal />); await waitFor(() => expect(screen.getByText('No practice recorded for this day.')).toBeInTheDocument())
   })
 })
 

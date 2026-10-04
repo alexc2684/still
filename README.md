@@ -1,6 +1,8 @@
 # Still
 
 Still is a meditation timer and social practice log deployed as a Next.js PWA.
+Circle membership includes registered accounts only; anonymous visitors are not
+counted or listed. Registered accounts remain members when signed out.
 
 For a shared practice, open **Together** from Practice, create a sit, and share
 the invitation link with friends. Friends sign in with their existing Still
@@ -47,14 +49,27 @@ separate manual production deployment is not required.
 ## PWA behavior
 
 The timer uses elapsed wall-clock time so it does not drift when a tab is
-backgrounded. Browser audio requires an initial user gesture. The end bell is
-supported while the page is active; iOS background or locked-screen audio needs
-on-device verification and is not guaranteed by a web PWA.
+backgrounded, and solo sessions can be paused and resumed. Browser audio
+requires an initial user gesture. The completion bell is supported while the
+page is active; iOS playback mode is requested when available, but background or
+locked-screen audio still needs on-device verification and is not guaranteed by
+a web PWA.
 
 Phone practice reminders are opt-in. The browser asks for notification
 permission only after the user taps Enable in Profile. Delivery runs hourly on
 the free public-repository GitHub Actions runner and is best effort around the
 chosen local hour; it does not promise exact-minute delivery.
+
+## Password reset
+
+Run `npm run db:migrate` before releasing password reset. Configure `APP_URL`
+with the canonical app origin, `RESEND_API_KEY` with a Resend sending key, and
+`AUTH_EMAIL_FROM` with a sender on a verified domain (for example,
+`Still <hello@example.com>`). Email is sent using the
+[Resend email API](https://resend.com/docs/api-reference/emails/send-email).
+Missing configuration produces a temporary-unavailability message; reset links
+are never returned by the API or logged. Links expire after 30 minutes. A
+successful reset invalidates all outstanding links and existing login sessions.
 
 ## Offline practice
 

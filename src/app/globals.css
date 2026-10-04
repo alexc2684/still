@@ -4,9 +4,9 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: var(--paper); color: var(--ink); }
 body { font-family: Manrope, -apple-system, BlinkMacSystemFont, sans-serif; font-size: 14px; letter-spacing: -.01em; }
-button, input, textarea { font: inherit; }
+button, input, select, textarea { font: inherit; }
 button { color: inherit; border: 0; cursor: pointer; }
-button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid rgba(100,130,105,.45); outline-offset: 3px; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid rgba(100,130,105,.45); outline-offset: 3px; }
 .app-shell { min-height: 100svh; padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
 .topbar { height: 76px; display: flex; align-items: center; justify-content: space-between; max-width: 1160px; margin: auto; padding: 0 32px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 600; letter-spacing: -.05em; background: transparent; padding: 4px 0; }
@@ -15,7 +15,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px
 .streak-pill { color: var(--sage-dark); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; font-family: 'DM Mono', monospace; }
 .streak-pill span { color: #bd8e52; font-size: 15px; }
 .avatar, .post-avatar { display: grid; place-items: center; border-radius: 50%; background: var(--sage); color: #304333; font-weight: 600; }
-.avatar { width: 32px; height: 32px; font-size: 12px; }
+.avatar { width: 42px; height: 42px; padding: 0; font-size: 12px; overflow: visible; flex: none; }
 .page-wrap { max-width: 1160px; margin: 0 auto; padding: 40px 32px 80px; }
 .practice-view { max-width: 760px; margin: 0 auto; }
 .eyebrow { font: 500 10px 'DM Mono', monospace; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
@@ -63,6 +63,42 @@ h2 { font-size: 19px; line-height: 1.2; letter-spacing: -.04em; font-weight: 600
 .bottom-nav { height: calc(72px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); }
 .auth-modal input, .comment-form input { font-size: 16px; }
 .practice-mode { display:flex; gap:7px; margin: 0 auto 12px; max-width: 760px; }.practice-mode button { min-height:44px; flex:1; border:1px solid var(--line); border-radius:7px; background:transparent; color:var(--muted); }.practice-mode button.selected { background:var(--ink); color:#fff; border-color:var(--ink); }
+.practice-kind { display:flex; align-items:center; justify-content:flex-end; gap:10px; margin:0 auto 18px; max-width:760px; }
+.practice-kind label { color:var(--muted); font:500 10px 'DM Mono', monospace; letter-spacing:.12em; text-transform:uppercase; }
+.practice-select-wrap { position:relative; }
+.practice-select-wrap::after { content:'⌄'; position:absolute; right:13px; top:50%; transform:translateY(-56%); color:var(--sage-dark); pointer-events:none; font-size:16px; }
+.practice-kind select { min-width:132px; min-height:44px; appearance:none; border:1px solid var(--line); border-radius:999px; background:var(--surface); color:var(--ink); padding:0 40px 0 17px; font-size:12px; font-weight:600; cursor:pointer; box-shadow:0 5px 18px rgba(58,62,52,.035); }
+.practice-kind select:disabled { color:var(--muted); cursor:not-allowed; opacity:.72; }
+.practice-stats { max-width:760px; margin:14px auto 0; color:var(--muted); font-size:11px; text-align:center; line-height:1.5; }
+@media (max-width:600px) { .practice-kind { margin-bottom:14px; } .practice-kind select { min-width:124px; } .practice-stats { margin:14px auto 72px; } }
+
+.reset-page { min-height: 100svh; display: grid; place-items: center; padding: 24px; }
+.reset-page > .auth-modal { width: min(100%, 440px); }
+.reset-page h1 { font-size: 28px; margin-top: 28px; }
+
+/* The solo sit is a stationary screen; journals and dialogs retain scrolling. */
+html:has(.practice-screen), body:has(.practice-screen) { overflow: hidden; overscroll-behavior: none; }
+.practice-screen { height: 100dvh; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.practice-screen .topbar { width: 100%; flex-shrink: 0; }
+.practice-screen .page-wrap { width: 100%; min-height: 0; flex: 1; padding-top: 16px; padding-bottom: 12px; overflow: hidden; }
+.sit-screen .timer-dial { width: min(70vw, 32dvh, 300px); }
+@media (max-height: 650px) {
+  .practice-screen .topbar { height: 44px; }
+  .practice-screen .page-wrap { padding-top: 6px; }
+  .sit-screen .practice-mode { margin-bottom: 8px; }
+  .sit-screen .sit-heading { margin-bottom: 8px; }
+  .sit-screen .timer-page-heading { font-size: 24px; }
+  .sit-screen .timer-dial { width: min(28dvh, 180px); margin: 6px auto 12px; }
+  .sit-screen .timer-dial-center strong { font-size: 34px; }
+  .sit-screen .practice-timer-card { padding-top: 6px; padding-bottom: 12px; }
+  .sit-screen .sound-preview { margin-bottom: 4px; }
+}
+
+.practice-screen .page-wrap { display: flex; flex-direction: column; }
+.practice-screen .practice-mode { flex-shrink: 0; }
+.practice-screen .page-wrap > div:not([hidden]) { min-height: 0; }
+.practice-screen .page-wrap > div:not([hidden]):not(.practice-mode) { flex: 1; }
+.practice-screen .practice-mode { width: 100%; max-width: 760px; }
 .offline-notice { max-width: 760px; margin: 0 auto 20px; padding: 12px 16px; border-radius: 8px; background: #e8eee4; color: var(--sage-dark); font-size: 12px; line-height: 1.6; }
 .offline-notice .text-button { display: block; margin-top: 4px; padding: 0; }
 .offline-journal-notice { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0 0 16px; }

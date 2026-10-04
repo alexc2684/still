@@ -1,0 +1,114 @@
+.walking-view {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 8px 20px 20px;
+  text-align: center;
+  color: var(--ink);
+}
+.walking-view h1 {
+  font-family: Manrope, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: clamp(31px, 7vw, 48px);
+  font-weight: 500;
+  line-height: 1.05;
+  margin: 12px auto 18px;
+  max-width: 540px;
+}
+.walking-eyebrow,
+.walking-countdown {
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font:
+    11px "DM Mono",
+    monospace;
+}
+.walking-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 22px auto 20px;
+  max-width: 460px;
+  text-align: left;
+}
+.walking-settings label {
+  font-size: 12px;
+  color: var(--muted);
+}
+.walking-settings select {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--ink);
+}
+.walking-location-note { max-width: 430px; margin: 0 auto 18px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.walking-slow-note { color: var(--muted); font-size: 11px; margin: 8px auto 16px; }
+.walking-plant {
+  display: block;
+  width: min(75vw, 310px);
+  height: auto;
+  margin: 8px auto;
+}
+.walking-active .walking-plant {
+  width: min(58vw, 230px);
+  margin-block: -42px 0;
+}
+.plant-ground,
+.plant-stem,
+.plant-vein {
+  fill: none;
+  stroke: #53694d;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.plant-ground {
+  opacity: 0.35;
+}
+.plant-leaf {
+  fill: url(#leaf);
+  stroke: #607656;
+  stroke-width: 1;
+}
+.plant-vein {
+  opacity: 0.65;
+  stroke-width: 1;
+}
+.walking-plant g {
+  transition: transform 0.8s ease;
+}
+.walking-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.walking-actions {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 12px;
+  max-width: 430px;
+  margin: 0 auto;
+}
+.walking-actions button {
+  width: 100%;
+}
+.walking-complete .walking-plant {
+  margin-bottom: -4px;
+}
+.walking-complete > .primary-button {
+  max-width: 430px;
+  width: 100%;
+  margin-top: 10px;
+}
+@media (max-width: 480px) {
+  .walking-view {
+    padding: 0 4px 12px;
+  }
+  .walking-settings { grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px; }
+  .walking-settings select { padding: 10px 8px; }
+  .walking-actions {
+    grid-template-columns: 1.6fr 1fr;
+  }
+}

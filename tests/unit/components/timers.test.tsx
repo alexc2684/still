@@ -27,17 +27,37 @@ describe('PracticeTimer session resolution', () => {
 })
 
 describe('TimerDial', () => {
-  it('formats time, clamps number input, handles keyboard bounds, and renders progress states', async () => {
+  it('uses a full-session countdown ring while preserving duration-picker revolutions', () => {
+    const circumference = 2 * Math.PI * 126
+    const progressOffset = () => Number(document.querySelector('.timer-dial-progress')!.getAttribute('stroke-dashoffset'))
+    const view = render(<TimerDial durationMinutes={10} remainingSeconds={600} onDurationChange={vi.fn()} />)
+    expect(document.querySelectorAll('.timer-dial-ticks line')).toHaveLength(60)
+    expect(document.querySelectorAll('.timer-dial-ticks .major')).toHaveLength(12)
+    expect(document.querySelector('.timer-dial svg')).toHaveAttribute('aria-hidden', 'true')
+    expect(progressOffset()).toBeCloseTo(circumference * (5 / 6))
+    view.rerender(<TimerDial durationMinutes={10} remainingSeconds={600} running disabled />)
+    expect(progressOffset()).toBeCloseTo(0)
+    view.rerender(<TimerDial durationMinutes={10} remainingSeconds={300} running disabled phaseLabel="paused" />)
+    expect(document.querySelector('.timer-dial')).toHaveAttribute('data-phase', 'paused')
+    expect(document.querySelector('.timer-dial')).toHaveAttribute('data-running', 'true')
+    expect(progressOffset()).toBeCloseTo(circumference / 2)
+    view.rerender(<TimerDial durationMinutes={10} remainingSeconds={12} running disabled />)
+    expect(progressOffset()).toBeCloseTo(circumference * .98)
+    view.rerender(<TimerDial durationMinutes={10} remainingSeconds={0} running disabled />)
+    expect(progressOffset()).toBeCloseTo(circumference)
+    view.rerender(<TimerDial durationMinutes={120} remainingSeconds={7200} onDurationChange={vi.fn()} />)
+    expect(document.querySelector('.timer-dial-progress-second')).not.toBeNull()
+  })
+  it('formats time, offers only dial controls, handles keyboard bounds, and renders progress states', async () => {
     const change = vi.fn()
     const { rerender } = render(<TimerDial durationMinutes={10} remainingSeconds={65} onDurationChange={change} phaseLabel="minutes" />)
     expect(screen.getByText('01:05')).toBeInTheDocument()
-    const input = screen.getByLabelText('Duration')
-    await userEvent.clear(input); await userEvent.type(input, '0'); fireEvent.change(input, { target: { value: '0' } }); expect(change).toHaveBeenCalledWith(1)
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
     const slider = screen.getByRole('slider')
     fireEvent.keyDown(slider, { key: 'ArrowRight' }); fireEvent.keyDown(slider, { key: 'ArrowUp' }); fireEvent.keyDown(slider, { key: 'ArrowLeft' }); fireEvent.keyDown(slider, { key: 'ArrowDown' }); fireEvent.keyDown(slider, { key: 'Home' }); fireEvent.keyDown(slider, { key: 'End' })
     expect(change).toHaveBeenCalledWith(120); expect(change).toHaveBeenCalledWith(1)
     rerender(<TimerDial durationMinutes={1} remainingSeconds={0} running onDurationChange={change} />); expect(screen.getByText('00:00')).toBeInTheDocument(); expect(screen.getByText('well done')).toBeInTheDocument()
-    rerender(<TimerDial durationMinutes={120} remainingSeconds={600} disabled onDurationChange={change} />); expect(screen.queryByRole('slider')).not.toBeInTheDocument(); expect(screen.getByLabelText('Duration')).toBeDisabled()
+    rerender(<TimerDial durationMinutes={120} remainingSeconds={600} disabled onDurationChange={change} />); expect(screen.queryByRole('slider')).not.toBeInTheDocument(); expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
   })
   it('supports pointer drag on the rim, thumb, seam wrapping, and ignores inner/readonly input', () => {
     const change = vi.fn(); render(<TimerDial durationMinutes={10} remainingSeconds={300} onDurationChange={change} />)
@@ -58,12 +78,33 @@ describe('TimerDial', () => {
     const change = vi.fn(); render(<TimerDial durationMinutes={10} remainingSeconds={600} onDurationChange={change} />)
     const dial = document.querySelector('.timer-dial')!; setRect(dial, 200, 200); Object.defineProperty(dial, 'setPointerCapture', { value: vi.fn() })
     fireEvent.pointerDown(dial, { pointerId: 1, clientX: 100, clientY: 100 }); expect(change).not.toHaveBeenCalled()
-    fireEvent.pointerDown(dial, { pointerId: 2, clientX: 141, clientY: 20 }); expect(change).toHaveBeenCalledWith(10)
+    fireEvent.pointerDown(dial, { pointerId: 2, clientX: 141, clientY: 20 }); expect(change).toHaveBeenCalledWith(5)
     fireEvent.pointerMove(dial, { pointerId: 2, clientX: 12, clientY: 100 }); fireEvent.pointerUp(dial, { pointerId: 2 })
     const disabledChange = vi.fn(); render(<TimerDial durationMinutes={10} remainingSeconds={600} disabled onDurationChange={disabledChange} />); const disabled = document.querySelectorAll('.timer-dial')[1]; fireEvent.keyDown(disabled.querySelector('[role="slider"]') || disabled, { key: 'End' }); expect(disabledChange).not.toHaveBeenCalled()
   })
   it('stops a captured drag safely if the dial becomes readonly mid-gesture', () => {
     const change = vi.fn(); const view = render(<TimerDial durationMinutes={10} remainingSeconds={300} onDurationChange={change} />); const dial = document.querySelector('.timer-dial')!; setRect(dial); Object.defineProperty(dial, 'setPointerCapture', { value: vi.fn() }); fireEvent.pointerDown(dial, { pointerId: 22, clientX: 140, clientY: 0 }); view.rerender(<TimerDial durationMinutes={10} remainingSeconds={300} disabled />); expect(() => fireEvent.pointerMove(dial, { pointerId: 22, clientX: 280, clientY: 140 })).not.toThrow()
+  })
+  it('uses full 60-minute revolutions and a second ring through 120 minutes', () => {
+    const change = vi.fn(); const view = render(<TimerDial durationMinutes={60} remainingSeconds={3600} onDurationChange={change} />)
+    let thumb = document.querySelector('.timer-dial-thumb')!; expect(Number(thumb.getAttribute('cx'))).toBeCloseTo(140); expect(Number(thumb.getAttribute('cy'))).toBeCloseTo(14); expect(document.querySelector('.timer-dial-progress-second')).toBeNull()
+    view.rerender(<TimerDial durationMinutes={120} remainingSeconds={7200} onDurationChange={change} />); thumb = document.querySelector('.timer-dial-thumb')!; expect(Number(thumb.getAttribute('cy'))).toBeCloseTo(14); expect(screen.getByText('second revolution')).toBeInTheDocument(); expect(document.querySelector('.timer-dial-progress-second')).not.toBeNull(); view.rerender(<TimerDial durationMinutes={120} remainingSeconds={0} running disabled />); expect(screen.queryByText('second revolution')).not.toBeInTheDocument()
+  })
+  it('selects and drags on the second revolution', () => {
+    const change = vi.fn(); render(<TimerDial durationMinutes={90} remainingSeconds={5400} onDurationChange={change} />); const dial = document.querySelector('.timer-dial')!; setRect(dial); Object.defineProperty(dial, 'setPointerCapture', { value: vi.fn() })
+    fireEvent.pointerDown(dial, { pointerId: 31, clientX: 140, clientY: 266 }); expect(change).toHaveBeenLastCalledWith(90)
+    fireEvent.pointerMove(dial, { pointerId: 31, clientX: 14, clientY: 140 }); fireEvent.pointerUp(dial, { pointerId: 31 })
+    fireEvent.pointerDown(dial, { pointerId: 32, clientX: 266, clientY: 140 }); expect(change).toHaveBeenLastCalledWith(75)
+    fireEvent.pointerMove(dial, { pointerId: 32, clientX: 140, clientY: 14 }); fireEvent.pointerCancel(dial, { pointerId: 32 })
+  })
+  it('accumulates subminute drag steps across 60 and reverses from the 120-minute bound', () => {
+    function Harness({ initial }: { initial: number }) { const [value, setValue] = React.useState(initial); return <TimerDial durationMinutes={value} remainingSeconds={value * 60} onDurationChange={next => { changes.push(next); setValue(next) }} /> }
+    const changes: number[] = []; const view = render(<Harness initial={59} />); const dial = document.querySelector('.timer-dial')!; setRect(dial); Object.defineProperty(dial, 'setPointerCapture', { value: vi.fn() })
+    const point = (degrees: number) => ({ clientX: 140 + 126 * Math.sin(degrees * Math.PI / 180), clientY: 140 - 126 * Math.cos(degrees * Math.PI / 180) })
+    fireEvent.pointerDown(dial, { pointerId: 41, ...point(354) })
+    for (let degrees = 355; degrees <= 366; degrees++) fireEvent.pointerMove(dial, { pointerId: 41, ...point(degrees % 360) })
+    fireEvent.pointerUp(dial, { pointerId: 41 }); expect(changes).toHaveLength(13); expect(changes.filter(value => value === 59).length).toBeGreaterThan(1); expect(changes.filter(value => value === 60).length).toBeGreaterThan(1); expect(changes.at(-1)).toBe(61)
+    view.unmount(); changes.length = 0; render(<Harness initial={120} />); const upper = document.querySelector('.timer-dial')!; setRect(upper); Object.defineProperty(upper, 'setPointerCapture', { value: vi.fn() }); fireEvent.pointerDown(upper, { pointerId: 42, ...point(0) }); for (let degrees = 359; degrees >= 354; degrees--) fireEvent.pointerMove(upper, { pointerId: 42, ...point(degrees) }); fireEvent.pointerUp(upper, { pointerId: 42 }); expect(changes.at(-1)).toBe(119)
   })
 })
 
@@ -74,7 +115,8 @@ describe('PracticeTimer', () => {
   it('starts, persists, counts down, completes, opens reflection and saves it', async () => {
     vi.useRealTimers(); const ui = userEvent.setup()
     const now = Date.now(); fetchMock.mockResolvedValueOnce(response({ session: { id: 's1', startedAt: new Date(now - 2000).toISOString(), plannedSeconds: 1 } })).mockResolvedValueOnce(response({}));
-    render(<PracticeTimer user={user} />); expect(screen.getByRole('heading')).toHaveTextContent(/sit/); await ui.click(screen.getByRole('button', { name: /Begin practice/i }));
+    render(<PracticeTimer user={user} />); expect(screen.getByRole('heading')).toHaveTextContent(/sit/); expect(screen.queryByText('A little quieter. A little more present.')).not.toBeInTheDocument(); await ui.click(screen.getByRole('button', { name: /Begin practice/i }));
+    expect(screen.queryByText('Stay with the breath')).not.toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith('/api/sessions/start', expect.anything()); await waitFor(() => expect(screen.getByText('well done')).toBeInTheDocument()); expect(bowlMock.playBowl).toHaveBeenCalled()
     expect(screen.getByRole('button', { name: /Edit reflection/i })).toBeInTheDocument(); await ui.click(screen.getByRole('button', { name: /Edit reflection/i })); await ui.click(screen.getByRole('button', { name: 'Before 3 of 5' })); await ui.click(screen.getByRole('button', { name: 'During 4 of 5' })); await ui.click(screen.getByRole('button', { name: 'After 5 of 5' })); await ui.type(screen.getByRole('textbox'), 'quiet noticing'); fetchMock.mockResolvedValueOnce(response({})); await ui.click(screen.getByRole('button', { name: /Save reflection/i })); await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/sessions/s1/reflection', expect.objectContaining({ body: expect.stringContaining('quiet noticing') })))
   })
@@ -82,7 +124,7 @@ describe('PracticeTimer', () => {
     vi.useRealTimers()
     const ui = userEvent.setup(); const onSignIn = vi.fn(); render(<PracticeTimer user={null} onSignIn={onSignIn} />); await ui.click(screen.getByRole('button', { name: /Sign in/ })); expect(onSignIn).toHaveBeenCalled()
     const onActive = vi.fn(); fetchMock.mockResolvedValueOnce(response({ error: 'nope' }, false, 400)); render(<PracticeTimer user={user} onActiveChange={onActive} />); await ui.click(screen.getAllByRole('button', { name: /Begin practice/ })[0]); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('nope'))
-    fetchMock.mockResolvedValueOnce(response({ session: { id: 's2', startedAt: new Date().toISOString(), plannedSeconds: 10 } })); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('button', { name: /End session/ })).toBeInTheDocument()); fetchMock.mockResolvedValueOnce(response({ error: 'cannot end' }, false, 400)); await ui.click(screen.getByRole('button', { name: /End session/ })); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('cannot end'))
+    fetchMock.mockResolvedValueOnce(response({ session: { id: 's2', startedAt: new Date().toISOString(), plannedSeconds: 10 } })); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()); fetchMock.mockResolvedValueOnce(response({ error: 'cannot end' }, false, 400)); await ui.click(screen.getByRole('button', { name: 'Pause' })); await ui.click(screen.getByRole('button', { name: /End session/ })); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('cannot end'))
     expect(onActive).toHaveBeenCalled()
   })
   it('restores pending completion and retries, hydrates legacy drafts, skips and starts anew', async () => {
@@ -104,32 +146,32 @@ describe('PracticeTimer', () => {
     vi.useRealTimers(); render(<PracticeTimer user={user} />); await userEvent.click(screen.getByRole('button', { name: /Preview sound/ })); expect(bowlMock.unlockBowlAudio).toHaveBeenCalled(); expect(bowlMock.playBowl).toHaveBeenCalled()
   })
   it('cancels a successfully started session without completing it', async () => {
-    vi.useRealTimers(); const ui = userEvent.setup(); fetchMock.mockResolvedValueOnce(response({ session: { id: 'cancel', startedAt: new Date().toISOString(), plannedSeconds: 60 } })).mockResolvedValueOnce(response({})); render(<PracticeTimer user={user} />); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('button', { name: /End session/ })).toBeInTheDocument()); await ui.click(screen.getByRole('button', { name: /End session/ })); await waitFor(() => expect(screen.getByRole('button', { name: /Begin practice/ })).toBeInTheDocument()); expect(fetchMock).not.toHaveBeenCalledWith('/api/sessions/cancel/complete', expect.anything())
+    vi.useRealTimers(); const ui = userEvent.setup(); fetchMock.mockResolvedValueOnce(response({ session: { id: 'cancel', startedAt: new Date().toISOString(), plannedSeconds: 60 } })).mockResolvedValueOnce(response({})); render(<PracticeTimer user={user} />); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()); await ui.click(screen.getByRole('button', { name: 'Pause' })); await ui.click(screen.getByRole('button', { name: /End session/ })); await waitFor(() => expect(screen.getByRole('button', { name: /Begin practice/ })).toBeInTheDocument()); expect(fetchMock).not.toHaveBeenCalledWith('/api/sessions/cancel/complete', expect.anything())
   })
   it('reports malformed start responses and supports snake-case start fields', async () => {
     vi.useRealTimers(); const ui = userEvent.setup(); fetchMock.mockResolvedValueOnce(response({ session: { id: 'bad', plannedSeconds: 60 } })); render(<PracticeTimer user={user} />); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('start time'))
-    cleanup(); fetchMock.mockReset(); fetchMock.mockResolvedValueOnce(response({ session: { id: 'snake', started_at: new Date().toISOString() } })); render(<PracticeTimer user={user} />); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('button', { name: /End session/ })).toBeInTheDocument())
+    cleanup(); fetchMock.mockReset(); fetchMock.mockResolvedValueOnce(response({ session: { id: 'snake', started_at: new Date().toISOString() } })); render(<PracticeTimer user={user} />); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument())
   })
   it('handles wake-lock visibility transitions and rejected start JSON', async () => {
     vi.useRealTimers(); const ui = userEvent.setup(); const request = navigator.wakeLock.request as ReturnType<typeof vi.fn>; request.mockRejectedValueOnce(new Error('denied')); fetchMock.mockResolvedValueOnce({ ok: false, json: vi.fn().mockRejectedValue('bad') }); render(<PracticeTimer user={user} />); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Could not begin your practice.')); expect(request).not.toHaveBeenCalled()
-    fetchMock.mockResolvedValueOnce(response({ session: { id: 'wake', startedAt: new Date().toISOString(), plannedSeconds: 60 } })); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('button', { name: /End session/ })).toBeInTheDocument()); Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' }); fireEvent(document, new Event('visibilitychange')); Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' }); fireEvent(document, new Event('visibilitychange')); expect(request).toHaveBeenCalled()
+    fetchMock.mockResolvedValueOnce(response({ session: { id: 'wake', startedAt: new Date().toISOString(), plannedSeconds: 60 } })); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()); Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' }); fireEvent(document, new Event('visibilitychange')); Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' }); fireEvent(document, new Event('visibilitychange')); expect(request).toHaveBeenCalled()
   })
   it('normalizes non-Error start, cancel, and reflection failures', async () => {
     vi.useRealTimers(); const ui = userEvent.setup(); fetchMock.mockRejectedValueOnce('offline'); render(<PracticeTimer user={user} />); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Could not begin your practice.')); cleanup()
-    fetchMock.mockResolvedValueOnce(response({ session: { id: 'cancel-string', startedAt: new Date().toISOString(), plannedSeconds: 60 } })).mockRejectedValueOnce('offline'); render(<PracticeTimer user={user} />); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('button', { name: /End session/ })).toBeInTheDocument()); await ui.click(screen.getByRole('button', { name: /End session/ })); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Could not end this practice.')); cleanup()
+    fetchMock.mockResolvedValueOnce(response({ session: { id: 'cancel-string', startedAt: new Date().toISOString(), plannedSeconds: 60 } })).mockRejectedValueOnce('offline'); render(<PracticeTimer user={user} />); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()); await ui.click(screen.getByRole('button', { name: 'Pause' })); await ui.click(screen.getByRole('button', { name: /End session/ })); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Could not end this practice.')); cleanup()
     fetchMock.mockResolvedValueOnce(response({ sessions: [{ id: 'reflect' }] })); render(<PrivateReflection sessionId="reflect" userId="u" onSaved={vi.fn()} onSkip={vi.fn()} />); await waitFor(() => expect(screen.getByRole('button', { name: /Save reflection/ })).toBeEnabled()); fetchMock.mockRejectedValueOnce('offline'); await ui.click(screen.getByRole('button', { name: /Save reflection/ })); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Could not save reflection.'))
   })
   it('supports sign-in without a callback and disabled solo copy', async () => {
     vi.useRealTimers(); const ui = userEvent.setup(); render(<PracticeTimer user={null} />); await ui.click(screen.getByRole('button', { name: /Sign in to practice/ })); cleanup(); render(<PracticeTimer user={user} disabled />); expect(screen.getByRole('button', { name: /Group practice active/ })).toBeDisabled()
   })
   it('tolerates a rejected wake-lock release on cleanup', async () => {
-    vi.useRealTimers(); const ui = userEvent.setup(); const release = vi.fn().mockRejectedValue(new Error('release denied')); Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request: vi.fn().mockResolvedValue({ release }) } }); fetchMock.mockResolvedValueOnce(response({ session: { id: 'wake-release', startedAt: new Date().toISOString(), plannedSeconds: 60 } })); const view = render(<PracticeTimer user={user} />); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('button', { name: /End session/ })).toBeInTheDocument()); view.unmount(); await Promise.resolve(); expect(release).toHaveBeenCalled()
+    vi.useRealTimers(); const ui = userEvent.setup(); const release = vi.fn().mockRejectedValue(new Error('release denied')); Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request: vi.fn().mockResolvedValue({ release }) } }); fetchMock.mockResolvedValueOnce(response({ session: { id: 'wake-release', startedAt: new Date().toISOString(), plannedSeconds: 60 } })); const view = render(<PracticeTimer user={user} />); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()); view.unmount(); await Promise.resolve(); expect(release).toHaveBeenCalled()
   })
   it('retries a 422 completion once and rings only once', async () => {
-    vi.useFakeTimers(); vi.setSystemTime(100_000); let completions = 0; fetchMock.mockImplementation((url: string) => url === '/api/sessions/start' ? Promise.resolve(response({ session: { id: 'skew', startedAt: new Date(98_000).toISOString(), plannedSeconds: 1 } })) : Promise.resolve(++completions === 1 ? response({ error: 'early' }, false, 422) : response({}))); render(<PracticeTimer user={user} />); fireEvent.click(screen.getByRole('button', { name: /Begin practice/ })); await act(async () => { await Promise.resolve() }); await act(async () => { await vi.advanceTimersByTimeAsync(500) }); await act(async () => { await vi.advanceTimersByTimeAsync(1200); await Promise.resolve() }); expect(completions).toBe(2); expect(bowlMock.playBowl).toHaveBeenCalledTimes(1); expect(screen.getByText('well done')).toBeInTheDocument()
+    vi.useFakeTimers(); vi.setSystemTime(100_000); let completions = 0; fetchMock.mockImplementation((url: string) => url === '/api/sessions/start' ? Promise.resolve(response({ session: { id: 'skew', startedAt: new Date(98_000).toISOString(), plannedSeconds: 1 } })) : Promise.resolve(++completions === 1 ? response({ error: 'early' }, false, 422) : response({}))); render(<PracticeTimer user={user} />); fireEvent.click(screen.getByRole('button', { name: /Begin practice/ })); await act(async () => { await Promise.resolve() }); await act(async () => { await vi.advanceTimersByTimeAsync(500) }); await act(async () => { await vi.advanceTimersByTimeAsync(1200); await Promise.resolve() }); expect(completions).toBe(2); expect(bowlMock.playBowl).toHaveBeenCalledTimes(1); expect(bowlMock.playBowl).toHaveBeenCalledWith(); expect(screen.getByText('well done')).toBeInTheDocument()
   })
   it('keeps completion failure retryable and succeeds on explicit retry', async () => {
-    vi.useFakeTimers(); vi.setSystemTime(200_000); let completions = 0; fetchMock.mockImplementation((url: string) => url === '/api/sessions/start' ? Promise.resolve(response({ session: { id: 'retry-complete', startedAt: new Date(198_000).toISOString(), plannedSeconds: 1 } })) : Promise.resolve(++completions === 1 ? response({ error: 'early' }, false, 422) : response({ error: 'offline' }, false, 500))); render(<PracticeTimer user={user} />); fireEvent.click(screen.getByRole('button', { name: /Begin practice/ })); await act(async () => { await Promise.resolve() }); await act(async () => { await vi.advanceTimersByTimeAsync(1800) }); expect(screen.getByRole('button', { name: /Retry save/ })).toBeInTheDocument(); fetchMock.mockImplementation((url: string) => url === '/api/sessions/retry-complete/complete' ? Promise.resolve(response({})) : Promise.resolve(response({ session: { id: 'unused', startedAt: new Date().toISOString(), plannedSeconds: 1 } }))); fireEvent.click(screen.getByRole('button', { name: /Retry save/ })); await act(async () => { await Promise.resolve() }); expect(screen.getByText('well done')).toBeInTheDocument(); expect(bowlMock.playBowl).toHaveBeenCalledTimes(1)
+    vi.useFakeTimers(); vi.setSystemTime(200_000); let completions = 0; fetchMock.mockImplementation((url: string) => url === '/api/sessions/start' ? Promise.resolve(response({ session: { id: 'retry-complete', startedAt: new Date(198_000).toISOString(), plannedSeconds: 1 } })) : Promise.resolve(++completions === 1 ? response({ error: 'early' }, false, 422) : response({ error: 'offline' }, false, 500))); render(<PracticeTimer user={user} />); fireEvent.click(screen.getByRole('button', { name: /Begin practice/ })); await act(async () => { await Promise.resolve() }); await act(async () => { await vi.advanceTimersByTimeAsync(1800) }); expect(screen.getByRole('button', { name: /Retry save/ })).toBeInTheDocument(); fetchMock.mockImplementation((url: string) => url === '/api/sessions/retry-complete/complete' ? Promise.resolve(response({})) : Promise.resolve(response({ session: { id: 'unused', startedAt: new Date().toISOString(), plannedSeconds: 1 } }))); fireEvent.click(screen.getByRole('button', { name: /Retry save/ })); await act(async () => { await Promise.resolve() }); expect(screen.getByText('well done')).toBeInTheDocument(); expect(bowlMock.playBowl).toHaveBeenCalledTimes(1); expect(bowlMock.playBowl).toHaveBeenCalledWith()
   })
   it('shows a generic error for a plain-string completion network failure', async () => {
     vi.useFakeTimers(); vi.setSystemTime(300_000); fetchMock.mockImplementation((url: string) => url === '/api/sessions/start' ? Promise.resolve(response({ session: { id: 'network-complete', startedAt: new Date(298_000).toISOString(), plannedSeconds: 1 } })) : Promise.reject('offline')); render(<PracticeTimer user={user} />); fireEvent.click(screen.getByRole('button', { name: /Begin practice/ })); await act(async () => { await Promise.resolve() }); await act(async () => { await vi.advanceTimersByTimeAsync(500) }); expect(screen.getByRole('alert')).toHaveTextContent('Could not save your session.')
@@ -195,4 +237,23 @@ describe('SharedSit', () => {
     fetchMock.mockResolvedValueOnce(response({ room: room({ isMember: false, isHost: false, hostUserId: 'other', members: [] }) })); render(<SharedSit user={{ id: 'guest', name: 'Guest' }} onSignIn={onSignIn} initialToken="abc" />); await waitFor(() => expect(screen.getByRole('button', { name: /Join this sit/ })).toBeInTheDocument()); fetchMock.mockResolvedValueOnce(response({ room: room({ isMember: true, isHost: false, hostUserId: 'other' }) })); await ui.click(screen.getByRole('button', { name: /Join this sit/ })); await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/shared-sits/abc/join', expect.anything()));
     fetchMock.mockResolvedValueOnce(response({ room: room({ status: 'completed', isMember: true, isHost: false, hostUserId: 'other', ownSessionId: 's1' }) }));
   })
+})
+
+it.each([1, 3, 10])('solo stays silent at start and rings once after %i minutes', async minutes => {
+  vi.useFakeTimers(); localStorage.clear(); bowlMock.playBowl.mockReset(); bowlMock.unlockBowlAudio.mockReset()
+  const fetcher = vi.fn(async (url: string) => response(url === '/api/sessions/start' ? { session: { id: 'end-only', startedAt: new Date().toISOString(), plannedSeconds: minutes * 60 } } : {}))
+  vi.stubGlobal('fetch', fetcher)
+  try {
+    render(<PracticeTimer user={{ id: 'end-only-user', name: 'Ada' }} />)
+    fireEvent.keyDown(screen.getByRole('slider'), { key: 'Home' })
+    for (let i = 1; i < minutes; i++) fireEvent.keyDown(screen.getByRole('slider'), { key: 'ArrowUp' })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Begin practice/ })) })
+    expect(bowlMock.unlockBowlAudio).toHaveBeenCalled(); expect(bowlMock.playBowl).not.toHaveBeenCalled()
+    await act(async () => { await vi.advanceTimersByTimeAsync(minutes * 60000 - 1000) })
+    expect(bowlMock.playBowl).not.toHaveBeenCalled()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    expect(bowlMock.playBowl).toHaveBeenCalledTimes(1)
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+    expect(bowlMock.playBowl).toHaveBeenCalledTimes(1)
+  } finally { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals() }
 })

@@ -20,6 +20,7 @@ try {
   const ctaBox = await cta.first().boundingBox();
   const navBox = await nav.boundingBox();
   assert.ok(ctaBox && navBox && ctaBox.y + ctaBox.height <= navBox.y - 8, 'practice CTA must clear the bottom nav');
+  await page.getByRole('button', { name: /Edit reflection/ }).click();
   await page.getByText('How did it feel?').waitFor();
   assert.equal(await page.getByLabel('Notes').count(), 1, 'reflection must have one Notes field');
   assert.equal(await page.locator('.mood-field').count(), 3, 'reflection must have three mood ratings');
