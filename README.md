@@ -95,8 +95,16 @@ build, not the dev server:
 ```bash
 npm run build
 npm run start -- --hostname 127.0.0.1 --port 3217
-node tests/offline-browser.mjs
+npx playwright install chromium webkit
+npm run test:browser:offline
 ```
 
 The browser regression uses fixture API responses and performs no real database
 writes. Phone background/locked-screen bell behavior still needs device checks.
+
+The mobile layout regression checks whole-button visibility, clipping ancestors,
+fixed-navigation overlap, hit-testing, and coordinate-based touch in Chromium
+and WebKit. It covers phone safe areas, narrow/short viewports, larger text,
+landscape, and viewport changes. CI runs it against the production build and
+retains viewport screenshots, including failures, for review. The original
+offline reload/reflection/sync regression also runs in this command.

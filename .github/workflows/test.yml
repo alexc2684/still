@@ -19,3 +19,25 @@ jobs:
       - run: npm ci
       - run: npm run test:coverage
       - run: npm run build
+      - name: Install browsers for mobile layout regressions
+        run: npx playwright install --with-deps chromium webkit
+      - name: Test offline mobile actions against the production build
+        env:
+          STILL_SCREENSHOT_DIR: test-results/offline-viewport
+        run: |
+          npm run start -- --hostname 127.0.0.1 --port 3217 &
+          still_server_pid=$!
+          trap 'kill "$still_server_pid"' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3217/ > /dev/null; then break; fi
+            sleep 1
+          done
+          npm run test:browser:offline
+      - name: Save mobile viewport screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-mobile-viewport
+          path: test-results/offline-viewport
+          if-no-files-found: ignore
+          retention-days: 7

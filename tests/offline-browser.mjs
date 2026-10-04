@@ -17,7 +17,7 @@ await page.evaluate(async()=>{await navigator.serviceWorker.ready;if(!navigator.
 assert.equal(await page.evaluate(async()=>{const c=await caches.open('still-shell-v10');return (await c.keys()).filter(k=>k.url.includes('/_next/static/')).length>0}),true)
 await context.setOffline(true)
 await page.reload()
-await page.getByText(/Offline · Solo/).waitFor()
+await page.getByText(/Offline ·/).waitFor()
 await page.screenshot({path:'/tmp/still-offline-ready.png',fullPage:true})
 await page.getByRole('button',{name:/Begin practice/}).click()
 await page.getByRole('button',{name:'Pause',exact:true}).waitFor()

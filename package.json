@@ -10,6 +10,7 @@
     "test:unit": "vitest run --maxWorkers=2 src tests/unit tests/lib.test.ts",
     "test:regression": "vitest run --maxWorkers=2 tests/regression tests/operational.regression.test.ts",
     "test:coverage": "vitest run --coverage --maxWorkers=2",
+    "test:browser:offline": "node tests/offline-viewport.mjs && node tests/offline-browser.mjs",
     "db:migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
