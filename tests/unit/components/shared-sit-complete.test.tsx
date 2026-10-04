@@ -84,12 +84,11 @@ describe('SharedSit complete behavior', () => {
   it('runs host countdown, wake lock lifecycle, completion retry and reflection acknowledgement', async () => {
     const now = Date.now(); const running = room({ status: 'running', startedAt: new Date(now - 5000).toISOString(), endsAt: new Date(now - 1000).toISOString(), ownSessionId: 's1' }); fetchMock.mockResolvedValueOnce(response({ room: running })).mockResolvedValueOnce(response({ error: 'complete nope' }, false)).mockResolvedValueOnce(response({})).mockResolvedValueOnce(response({ room: { ...running, status: 'completed' } })); render(<SharedSit user={host} onSignIn={vi.fn()} initialToken="abc" />)
     await waitFor(() => expect(screen.getByRole('button', { name: /retry completion/i })).toBeInTheDocument()); expect(playBowl).not.toHaveBeenCalled(); const request = (navigator.wakeLock.request as any); expect(request).toHaveBeenCalledWith('screen'); fireEvent(document, new Event('visibilitychange')); expect(request).toHaveBeenCalled()
-    await userEvent.click(screen.getByRole('button', { name: /retry completion/i })); await userEvent.click(await screen.findByRole('button', { name: /edit reflection/i })); await userEvent.click(await screen.findByRole('button', { name: /skip/i })); await waitFor(() => expect(screen.getByText(/sit is complete/i)).toBeInTheDocument()); await userEvent.click(screen.getByRole('button', { name: /edit reflection/i })); await userEvent.click(screen.getByRole('button', { name: /skip/i })); expect(localStorage.getItem('still:shared-reflection-ack:host:s1')).toBe('1')
+    await userEvent.click(screen.getByRole('button', { name: /retry completion/i })); await screen.findByText(/sit is complete/i); expect(screen.queryByRole('button', { name: /edit reflection/i })).toBeNull()
   })
 
   it('handles completed and cancelled rooms, storage failures, another sit, user changes and stale polls', async () => {
-    const onActive = vi.fn(); const completed = room({ status: 'completed', ownSessionId: 's2' }); fetchMock.mockResolvedValueOnce(response({ room: completed })); const { rerender } = render(<SharedSit user={guest} onSignIn={vi.fn()} initialToken="abc" onActiveChange={onActive} />); await userEvent.click(await screen.findByRole('button', { name: /edit reflection/i })); await waitFor(() => expect(screen.getByRole('button', { name: /skip/i })).toBeInTheDocument())
-    await userEvent.click(screen.getByRole('button', { name: /skip/i }));
+    const onActive = vi.fn(); const completed = room({ status: 'completed', ownSessionId: 's2' }); fetchMock.mockResolvedValueOnce(response({ room: completed })); const { rerender } = render(<SharedSit user={guest} onSignIn={vi.fn()} initialToken="abc" onActiveChange={onActive} />); await screen.findByText(/sit is complete/i); expect(screen.queryByRole('button', { name: /edit reflection/i })).toBeNull();
     fetchMock.mockResolvedValueOnce(response({ room: room({ status: 'cancelled', isMember: false }) })); rerender(<SharedSit user={host} onSignIn={vi.fn()} initialToken="abc" />); await waitFor(() => expect(screen.getByText(/cancelled/i)).toBeInTheDocument()); await userEvent.click(screen.getByRole('button', { name: /another/i })); expect(screen.getByText(/sit together/i)).toBeInTheDocument()
     rerender(<SharedSit user={null} onSignIn={vi.fn()} />); rerender(<SharedSit user={guest} onSignIn={vi.fn()} />); expect(screen.getByRole('button', { name: /create private/i })).toBeInTheDocument()
   })
@@ -100,13 +99,13 @@ describe('SharedSit complete behavior', () => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' }); fireEvent(document, new Event('visibilitychange')); await Promise.resolve(); expect((navigator.wakeLock.request as any)).toHaveBeenCalled(); unmount()
   })
 
-  it('saves completed reflection and exercises non-Error action recovery', async () => {
-    const saved = vi.fn(); const completed = room({ status: 'completed', ownSessionId: 'saved' }); fetchMock.mockResolvedValueOnce(response({ room: completed })); render(<SharedSit user={guest} onSignIn={vi.fn()} initialToken="abc" onSessionSaved={saved} />); await userEvent.click(await screen.findByRole('button', { name: /edit reflection/i })); await waitFor(() => expect(screen.getByRole('button', { name: /save reflection/i })).toBeInTheDocument()); await userEvent.click(screen.getByRole('button', { name: /save reflection/i })); expect(saved).toHaveBeenCalled()
+  it('prevents reflection editing on restored completion and exercises non-Error action recovery', async () => {
+    const saved = vi.fn(); const completed = room({ status: 'completed', ownSessionId: 'saved' }); fetchMock.mockResolvedValueOnce(response({ room: completed })); render(<SharedSit user={guest} onSignIn={vi.fn()} initialToken="abc" onSessionSaved={saved} />); await screen.findByText(/sit is complete/i); expect(screen.queryByRole('button', { name: /edit reflection/i })).toBeNull(); expect(saved).toHaveBeenCalled()
     cleanup(); fetchMock.mockResolvedValueOnce(response({ room: room() })); render(<SharedSit user={host} onSignIn={vi.fn()} initialToken="abc" />); await waitFor(() => expect(screen.getByRole('button', { name: /start shared sit/i })).toBeInTheDocument()); fetchMock.mockRejectedValueOnce('offline'); await userEvent.click(screen.getByRole('button', { name: /start shared sit/i })); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Unable to update shared sit.'))
   })
 
   it('records server clock offset, completes successfully, and leaves cleanly', async () => {
-    const saved = vi.fn(); const now = Date.now(); const running = room({ status: 'running', startedAt: new Date(now - 1000).toISOString(), endsAt: new Date(now - 1000).toISOString(), ownSessionId: 'done', serverNow: new Date(now).toISOString() }); fetchMock.mockResolvedValueOnce(response({ room: running })).mockResolvedValueOnce(response({})).mockResolvedValueOnce(response({ room: { ...running, status: 'completed' } })); render(<SharedSit user={host} onSignIn={vi.fn()} initialToken="abc" onSessionSaved={saved} />); await userEvent.click(await screen.findByRole('button', { name: /edit reflection/i })); await waitFor(() => expect(screen.getByRole('button', { name: /skip/i })).toBeInTheDocument()); await userEvent.click(screen.getByRole('button', { name: /skip/i })); await waitFor(() => expect(screen.getByText(/sit is complete/i)).toBeInTheDocument()); expect(saved).toHaveBeenCalled()
+    const saved = vi.fn(); const now = Date.now(); const running = room({ status: 'running', startedAt: new Date(now - 1000).toISOString(), endsAt: new Date(now - 1000).toISOString(), ownSessionId: 'done', serverNow: new Date(now).toISOString() }); fetchMock.mockResolvedValueOnce(response({ room: running })).mockResolvedValueOnce(response({})).mockResolvedValueOnce(response({ room: { ...running, status: 'completed' } })); render(<SharedSit user={host} onSignIn={vi.fn()} initialToken="abc" onSessionSaved={saved} />); await screen.findByText(/sit is complete/i); expect(screen.queryByRole('button', { name: /edit reflection/i })).toBeNull(); expect(saved).toHaveBeenCalled()
     cleanup(); fetchMock.mockResolvedValueOnce(response({ room: room({ isMember: true, isHost: false, hostUserId: 'other' }) })); render(<SharedSit user={guest} onSignIn={vi.fn()} initialToken="abc" />); await waitFor(() => expect(screen.getByRole('button', { name: /leave waiting/i })).toBeInTheDocument()); fetchMock.mockResolvedValueOnce(response({})); await userEvent.click(screen.getByRole('button', { name: /leave waiting/i })); await waitFor(() => expect(screen.getByText(/sit together/i)).toBeInTheDocument())
   })
 
@@ -171,8 +170,8 @@ describe('SharedSit complete behavior', () => {
     fetchMock.mockRejectedValueOnce('offline'); render(<SharedSit user={guest} onSignIn={vi.fn()} initialToken="abc" />); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Unable to load shared sit.'))
   })
 
-  it('completes an expired host session and offers its reflection without opening it', async () => {
-    const expired = room({ status: 'running', ownSessionId: 'complete-me', startedAt: new Date(Date.now() - 10000).toISOString(), endsAt: new Date(Date.now() - 1000).toISOString() }); let getCount = 0; fetchMock.mockImplementation((url: string, init?: RequestInit) => { if (url.endsWith('/complete')) return Promise.resolve(response({ ok: true })); if (init?.method === 'POST') return Promise.resolve(response({})); getCount += 1; return Promise.resolve(response({ room: getCount === 1 ? expired : { ...expired, status: 'completed' } })) }); render(<SharedSit user={host} onSignIn={vi.fn()} initialToken="abc" />); await userEvent.click(await screen.findByRole('button', { name: /edit reflection/i })); await waitFor(() => expect(screen.getByRole('button', { name: /save reflection/i })).toBeInTheDocument()); expect(fetchMock).toHaveBeenCalledWith('/api/shared-sits/abc/complete', expect.objectContaining({ method: 'POST' })); expect(screen.getByRole('button', { name: /save reflection/i })).toBeInTheDocument()
+  it('completes an expired host session without an editing shortcut', async () => {
+    const expired = room({ status: 'running', ownSessionId: 'complete-me', startedAt: new Date(Date.now() - 10000).toISOString(), endsAt: new Date(Date.now() - 1000).toISOString() }); let getCount = 0; fetchMock.mockImplementation((url: string, init?: RequestInit) => { if (url.endsWith('/complete')) return Promise.resolve(response({ ok: true })); if (init?.method === 'POST') return Promise.resolve(response({})); getCount += 1; return Promise.resolve(response({ room: getCount === 1 ? expired : { ...expired, status: 'completed' } })) }); render(<SharedSit user={host} onSignIn={vi.fn()} initialToken="abc" />); await screen.findByText(/sit is complete/i); expect(fetchMock).toHaveBeenCalledWith('/api/shared-sits/abc/complete', expect.objectContaining({ method: 'POST' })); expect(screen.queryByRole('button', { name: /edit reflection/i })).toBeNull()
   })
 
   it('starts a waiting host session and loads the running snapshot', async () => {
@@ -195,8 +194,8 @@ describe('SharedSit complete behavior', () => {
     fetchMock.mockResolvedValueOnce(response({ room: room() })); render(<SharedSit user={host} onSignIn={vi.fn()} initialToken="abc" disabled />); await waitFor(() => expect(screen.getByRole('button', { name: /cancel sit/i })).toBeInTheDocument()); await userEvent.click(screen.getByRole('button', { name: /cancel sit/i })); expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('opens reflection when acknowledgement storage is unavailable', async () => {
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('storage unavailable') }); fetchMock.mockResolvedValueOnce(response({ room: room({ status: 'completed', ownSessionId: 'storage-fallback' }) })); render(<SharedSit user={guest} onSignIn={vi.fn()} initialToken="abc" />); await userEvent.click(await screen.findByRole('button', { name: /edit reflection/i })); await waitFor(() => expect(screen.getByRole('button', { name: /save reflection/i })).toBeInTheDocument())
+  it('keeps restored reflections closed when acknowledgement storage is unavailable', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('storage unavailable') }); fetchMock.mockResolvedValueOnce(response({ room: room({ status: 'completed', ownSessionId: 'storage-fallback' }) })); render(<SharedSit user={guest} onSignIn={vi.fn()} initialToken="abc" />); await screen.findByText(/sit is complete/i); expect(screen.queryByRole('button', { name: /edit reflection/i })).toBeNull()
   })
 })
 
@@ -281,6 +280,29 @@ it.each(['available', 'acknowledged', 'unavailable'])('prompts only for a newly 
     render(<SharedSit user={guest} onSignIn={vi.fn()} initialToken="abc" />)
     await act(async () => {})
     expect(screen.queryByRole('button', { name: /Save reflection/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Edit reflection/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Edit reflection/ })).not.toBeInTheDocument()
+  } finally { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals() }
+})
+
+it('returns to shared sit setup after recording a new reflection', async () => {
+  vi.useFakeTimers(); localStorage.clear(); fetchMock.mockReset()
+  const saved = vi.fn(), now = Date.now()
+  let completed = false
+  const running = room({ status: 'running', ownSessionId: 'new-reflection', startedAt: new Date(now - 1000).toISOString(), endsAt: new Date(now + 60000).toISOString() })
+  fetchMock.mockImplementation(async () => response({ room: { ...running, status: completed ? 'completed' : 'running' } }))
+  vi.stubGlobal('fetch', fetchMock)
+  try {
+    render(<SharedSit user={guest} onSignIn={vi.fn()} initialToken="abc" onSessionSaved={saved} />)
+    await act(async () => {})
+    completed = true
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
+    expect(screen.getByRole('button', { name: /Save reflection/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Save reflection/ }))
+    await act(async () => {})
+    expect(screen.getByRole('button', { name: /Create private sit/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Edit reflection|Save reflection/ })).toBeNull()
+    expect(window.location.search).not.toContain('sit=')
+    expect(localStorage.getItem('still:shared-reflection-ack:guest:new-reflection')).toBe('1')
+    expect(saved).toHaveBeenCalled()
   } finally { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals() }
 })

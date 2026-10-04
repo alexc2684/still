@@ -135,7 +135,7 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
         const next = { local: true, sessionId: crypto.randomUUID(), startedAt, deadlineMs: Date.now() + minutes * 60000, plannedSeconds: minutes * 60 }
         // An offline session cannot start unless its recovery state is saved.
         localStorage.setItem(storageKey!, JSON.stringify(next))
-        setSavedLocally(false); setSaved(false); setCurrent(next); setRemaining(next.plannedSeconds)
+        hydratedDraftKeyRef.current = draftKey; setSavedLocally(false); setSaved(false); setCurrent(next); setRemaining(next.plannedSeconds)
         return
       }
       const response = await fetch('/api/sessions/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plannedSeconds: minutes * 60 }) })
@@ -145,7 +145,7 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
       const plannedSeconds = body.session.plannedSeconds || body.session.planned_seconds || minutes * 60
       if (!startedAt) throw new Error('The server did not return a start time.')
       const next = { sessionId: body.session.id, startedAt, deadlineMs: new Date(startedAt).getTime() + Math.round(plannedSeconds) * 1000, plannedSeconds: Math.round(plannedSeconds) }
-      persist(next); setSaved(false); setCurrent(next); setRemaining(plannedSeconds)
+      persist(next); hydratedDraftKeyRef.current = draftKey; setSaved(false); setCurrent(next); setRemaining(plannedSeconds)
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not begin your practice.') } finally { setBusy(false) }
   }
   function pause() {
@@ -175,9 +175,9 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
     setReflectionBusy(true); setReflectionError('')
     try {
       const payload = { beforeMood: draft.beforeMood ?? undefined, duringMood: draft.duringMood ?? undefined, afterMood: draft.afterMood ?? undefined, beforeNote: null, duringNote: null, afterNote: draft.notes }
-      const finish = () => { storageRemove(draftKey); storageRemove(reflectionSessionKey); hydratedDraftKeyRef.current = null; setReflection(false); setReflectionError('') }
+      const finish = () => { beginNewSession(); onSessionSaved?.() }
       if (id && user && (offline || navigator.onLine === false || readOutbox(user.id).some(job => job.id === id))) {
-        queueOfflineJob(user.id, { id, reflection: payload }); setSavedLocally(true); finish(); onSessionSaved?.()
+        queueOfflineJob(user.id, { id, reflection: payload }); finish()
       } else await savePracticeReflection(id, payload, finish)
     } catch (err) { setReflectionError(err instanceof Error ? err.message : 'Could not save reflection.') } finally { setReflectionBusy(false) }
   }
@@ -199,7 +199,7 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
       <TimerDial durationMinutes={active ? Math.round(active.plannedSeconds / 60) : minutes} remainingSeconds={displayRemaining} running={Boolean(active)} disabled={Boolean(active || saved)} onDurationChange={active || saved ? undefined : setMinutes} phaseLabel={saved ? 'well done' : active?.paused ? 'paused' : active ? 'remaining' : 'minutes'} />
       {!active && !saved && <button className="sound-preview" type="button" onClick={() => { unlockBowlAudio(); playBowl() }}>Preview sound</button>}
       {active && <div className="timer-session-actions"><button className="secondary-button" onClick={active.paused ? resume : pause} disabled={busy}>{active.paused ? 'Resume' : 'Pause'}</button>{active.paused && <button className="text-button" onClick={() => void cancel()} disabled={busy}>End session early</button>}</div>}
-      {saved && <><button className="primary-button" onClick={() => setReflection(true)}>Edit reflection <span>→</span></button><button className="text-button" onClick={beginNewSession}>New session</button></>}
+      {saved && <><button className="primary-button" onClick={() => setReflection(true)}>Record reflection <span>→</span></button><button className="text-button" onClick={beginNewSession}>New session</button></>}
       {!active && !saved && <button className="primary-button" onClick={() => void begin()} disabled={busy || disabled}>{busy ? 'Starting…' : user ? disabled ? 'Group practice active' : 'Begin practice' : 'Sign in to practice'} <span>→</span></button>}
       {savedLocally && <p role="status">Saved on this device. Your practice and reflection will sync when you reconnect.</p>}
       {error && <p className="practice-error" role="alert">{error} {active && completionFailedRef.current && <button onClick={() => { completionFailedRef.current = false; void completeNaturally(active) }}>Retry save</button>}</p>}
