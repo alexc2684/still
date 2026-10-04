@@ -81,14 +81,16 @@ html:has(.practice-screen), body:has(.practice-screen) { overflow: hidden; overs
 .practice-screen { height: 100dvh; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
 .practice-screen .topbar { width: 100%; flex-shrink: 0; }
 .practice-screen .page-wrap { width: 100%; min-height: 0; flex: 1; padding-top: 16px; padding-bottom: 12px; overflow: hidden; }
-.sit-screen .timer-dial { width: min(70vw, 32dvh, 300px); }
+/* Size the dial from the room left AFTER banners, selectors, and safe areas. */
+.sit-screen .solo-practice-panel { container-type: size; overflow-y: auto; overscroll-behavior-y: contain; scroll-padding-block: 8px; }
+.sit-screen .timer-dial { width: clamp(120px, min(70vw, calc(100cqh - 260px)), 300px); margin: 12px auto 16px; }
 @media (max-height: 650px) {
-  .practice-screen .topbar { height: 44px; }
+  .practice-screen .topbar { height: calc(44px + env(safe-area-inset-top, 0px)); }
   .practice-screen .page-wrap { padding-top: 6px; }
   .sit-screen .practice-mode { margin-bottom: 8px; }
   .sit-screen .sit-heading { margin-bottom: 8px; }
   .sit-screen .timer-page-heading { font-size: 24px; }
-  .sit-screen .timer-dial { width: min(28dvh, 180px); margin: 6px auto 12px; }
+  .sit-screen .timer-dial { width: clamp(112px, min(70vw, calc(100cqh - 220px)), 180px); margin: 6px auto 8px; }
   .sit-screen .timer-dial-center strong { font-size: 34px; }
   .sit-screen .practice-timer-card { padding-top: 6px; padding-bottom: 12px; }
   .sit-screen .sound-preview { margin-bottom: 4px; }
@@ -99,7 +101,8 @@ html:has(.practice-screen), body:has(.practice-screen) { overflow: hidden; overs
 .practice-screen .page-wrap > div:not([hidden]) { min-height: 0; }
 .practice-screen .page-wrap > div:not([hidden]):not(.practice-mode) { flex: 1; }
 .practice-screen .practice-mode { width: 100%; max-width: 760px; }
-.offline-notice { max-width: 760px; margin: 0 auto 20px; padding: 12px 16px; border-radius: 8px; background: #e8eee4; color: var(--sage-dark); font-size: 12px; line-height: 1.6; }
-.offline-notice .text-button { display: block; margin-top: 4px; padding: 0; }
+.offline-notice { display: flex; align-items: center; gap: 12px; flex-shrink: 0; width: 100%; max-width: 760px; margin: 0 auto 12px; padding: 8px 12px; border-radius: 8px; background: #e8eee4; color: var(--sage-dark); font-size: 12px; line-height: 1.5; }
+.offline-notice > span { flex: 1; min-width: 0; }
+.offline-notice .text-button { flex-shrink: 0; margin: 0; padding: 6px 0; }
 .offline-journal-notice { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0 0 16px; }
 button:disabled { cursor: default; opacity: .5; }

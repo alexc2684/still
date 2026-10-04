@@ -141,7 +141,7 @@ export default function Home() {
         </div>
       </header>
       <div className="page-wrap">
-        {offline&&<p role="status" className="offline-notice">Offline · Solo practice and reflections save on this device. Together, Circle, and account changes need a connection. <button className="text-button" onClick={()=>void refresh()}>Retry connection</button></p>}
+        {offline&&<p role="status" className="offline-notice"><span>Offline · Saved here; syncs online.</span> <button className="text-button" aria-label="Retry connection" onClick={()=>void refresh()}>Retry</button></p>}
         {syncError&&<p role="status">{syncError}</p>}
         {tab === "practice" && !soloActive && (
           <div className="practice-mode">
@@ -171,7 +171,7 @@ export default function Home() {
             onSessionSaved={refresh}
           />
         </div>
-        <div hidden={tab !== "practice" || mode !== "solo"}>
+        <div className="solo-practice-panel" hidden={tab !== "practice" || mode !== "solo"}>
           <PracticeTimer
             offline={offline}
             user={user}

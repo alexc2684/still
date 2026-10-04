@@ -108,15 +108,15 @@ describe('layout and service worker', () => {
 
 describe('offline shell',()=>{
   it('restores only the last device account while offline, handles missing snapshots, and reconnects',async()=>{
-    localStorage.clear();vi.spyOn(navigator,'onLine','get').mockReturnValue(false);vi.stubGlobal('fetch',vi.fn());render(<Home/>);await screen.findByText(/Offline · Solo/);fireEvent.click(screen.getByRole('button',{name:'Retry connection'}));expect(fetch).not.toHaveBeenCalled()
+    localStorage.clear();vi.spyOn(navigator,'onLine','get').mockReturnValue(false);vi.stubGlobal('fetch',vi.fn());render(<Home/>);await screen.findByText(/Offline ·/);fireEvent.click(screen.getByRole('button',{name:'Retry connection'}));expect(fetch).not.toHaveBeenCalled()
     localStorage.setItem('still:offline-account',JSON.stringify({user:{id:'u',name:'Ada',email:'fixture',timezone:'UTC'},dates:[]}));fireEvent(window,new Event('online'));await screen.findByRole('button',{name:'Ada'});expect(screen.getByRole('button',{name:'Together'})).toBeDisabled()
-    vi.spyOn(navigator,'onLine','get').mockReturnValue(true);vi.stubGlobal('fetch',vi.fn(async(url:string)=>url==='/api/auth/me'?response({user:{id:'u',name:'Ada',email:'fixture',timezone:'UTC'}}):response({practiceDates:[]})));fireEvent(window,new Event('online'));await waitFor(()=>expect(screen.queryByText(/Offline · Solo/)).toBeNull());fireEvent(window,new Event('offline'));await screen.findByText(/Offline · Solo/);localStorage.clear()
+    vi.spyOn(navigator,'onLine','get').mockReturnValue(true);vi.stubGlobal('fetch',vi.fn(async(url:string)=>url==='/api/auth/me'?response({user:{id:'u',name:'Ada',email:'fixture',timezone:'UTC'}}):response({practiceDates:[]})));fireEvent(window,new Event('online'));await waitFor(()=>expect(screen.queryByText(/Offline ·/)).toBeNull());fireEvent(window,new Event('offline'));await screen.findByText(/Offline ·/);localStorage.clear()
   })
   it('shows pending sync failures and retries after outbox changes and the interval',async()=>{
     localStorage.clear();vi.spyOn(navigator,'onLine','get').mockReturnValue(true);localStorage.setItem('still:outbox:u',JSON.stringify([{id:'one',reflection:{afterNote:'private'}}]));const f=vi.fn(async(url:string)=>url==='/api/auth/me'?response({user:{id:'u',name:'Ada',email:'fixture',timezone:'UTC'}}):url.includes('/reflection')?response({},false):response({practiceDates:[]}));vi.stubGlobal('fetch',f);render(<Home/>);await screen.findByText(/saved on this device/);fireEvent(window,new Event('still:outbox'));await waitFor(()=>expect(f.mock.calls.filter(([url])=>url.includes('/reflection')).length).toBeGreaterThan(1));localStorage.clear()
   })
   it('handles failed auth transport using the cached account',async()=>{
-    localStorage.clear();vi.stubGlobal('fetch',vi.fn().mockRejectedValue(new Error('offline')));render(<Home/>);await screen.findByText(/Offline · Solo/)
+    localStorage.clear();vi.stubGlobal('fetch',vi.fn().mockRejectedValue(new Error('offline')));render(<Home/>);await screen.findByText(/Offline ·/)
   })
 })
 it('does not publish a stale sync error after the page unmounts',async()=>{
