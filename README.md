@@ -108,3 +108,12 @@ and WebKit. It covers phone safe areas, narrow/short viewports, larger text,
 landscape, and viewport changes. CI runs it against the production build and
 retains viewport screenshots, including failures, for review. The original
 offline reload/reflection/sync regression also runs in this command.
+
+## Ending a solo sit early
+
+Pause the timer and choose **End session early**. The popup asks **Why are you
+ending early?** with an optional reason. **Resume sit** closes it and leaves
+the sit paused. **End session** saves the time actually practiced and opens
+reflection. The optional reason is included in private reflection notes, and
+early endings also work offline. Saving reflection returns to Begin practice;
+later edits belong in the Journal calendar.

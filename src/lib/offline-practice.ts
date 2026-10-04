@@ -2,7 +2,7 @@
 import { storageGet, storageRemove, storageSet } from './practice-storage'
 
 export type OfflineUser = { id: string; name: string; email: string; timezone: string; weeklyTarget?: number; avatarKey?: string | null }
-export type OfflinePractice = { id: string; startedAt: string; plannedSeconds: number; completedAt: string }
+export type OfflinePractice = { id: string; startedAt: string; plannedSeconds: number; completedAt: string; elapsedSeconds?: number; endedEarly?: boolean }
 export type OfflineJob = { id: string; practice?: OfflinePractice; reflection?: Record<string, unknown> }
 const accountKey = 'still:offline-account'
 const queueKey = (userId: string) => `still:outbox:${userId}`

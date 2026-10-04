@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import './practice-timer.css'
 import { combineJournalNotes } from './journalNotes'
 import { playBowl, unlockBowlAudio } from '@/lib/bowl'
@@ -28,6 +29,7 @@ type ActivePractice = {
   plannedSeconds: number
   paused?: boolean
   pausedRemainingSeconds?: number
+  earlyCompletion?: { elapsedSeconds: number; completedAt: string; notes: string }
 }
 type Draft = { beforeMood: Mood | null; duringMood: Mood | null; afterMood: Mood | null; notes: string; beforeNote?: string; duringNote?: string; afterNote?: string }
 type Stored = ActivePractice & { completionPending?: boolean }
@@ -48,12 +50,16 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [reflection, setReflection] = useState(false)
+  const [endingEarly, setEndingEarly] = useState(false)
+  const [endReason, setEndReason] = useState('')
+  const [dialogViewport, setDialogViewport] = useState<{height:number;top:number}|null>(null)
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
   const [reflectionBusy, setReflectionBusy] = useState(false)
   const [reflectionError, setReflectionError] = useState('')
   const [saved, setSaved] = useState(false)
   const [savedLocally, setSavedLocally] = useState(false)
   const [timeOfDay, setTimeOfDay] = useState('Time to sit')
+  const earlyNotesRef = useRef<string | null>(null)
   const ownerKeyRef = useRef<string | null>(null)
   const activeRef = useRef<ActivePractice | null>(null)
   const completedIdRef = useRef<string | null>(null)
@@ -72,10 +78,11 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
   const completeNaturally = useCallback(async (session: ActivePractice, prompt = true) => {
     if (completingRef.current) return
     completingRef.current = true; setBusy(true); setError('')
-    const payload = { elapsedSeconds: session.plannedSeconds }
+    const early = session.earlyCompletion
+    const payload = early ? { elapsedSeconds: early.elapsedSeconds, endedEarly: true, afterNote: early.notes } : { elapsedSeconds: session.plannedSeconds }
     try {
       if (session.local || offline || navigator.onLine === false) {
-        queueOfflineJob(user!.id, { id: session.sessionId, practice: { id: session.sessionId, startedAt: session.startedAt, plannedSeconds: session.plannedSeconds, completedAt: new Date(session.deadlineMs).toISOString() } })
+        queueOfflineJob(user!.id, { id: session.sessionId, practice: { id: session.sessionId, startedAt: session.startedAt, plannedSeconds: session.plannedSeconds, completedAt: early?.completedAt ?? new Date(session.deadlineMs).toISOString(), ...(early ? { elapsedSeconds: early.elapsedSeconds, endedEarly: true } : {}) }, ...(early ? { reflection: { afterNote: early.notes } } : {}) })
         setSavedLocally(true)
       } else {
         let response = await fetch(`/api/sessions/${session.sessionId}/complete`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
@@ -83,6 +90,8 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
         if (response.status === 422) { await new Promise(resolve => window.setTimeout(resolve, 1200)); response = await fetch(`/api/sessions/${session.sessionId}/complete`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }) }
         if (!response.ok) { const body = await jsonBody(response); throw new Error(body.error || 'Still could not save the completed session.') }
       }
+      if (early) setDraft(current => ({ ...current, notes: early.notes }))
+      setEndingEarly(false); setEndReason('')
       completedIdRef.current = session.sessionId; storageSet(reflectionSessionKey, session.sessionId); persist(null); setCurrent(null); setRemaining(0); setSaved(true); setReflection(prompt); onSessionSaved?.(); releaseWakeLock()
     } catch (err) {
       completionFailedRef.current = true; persist({ ...session, completionPending: true }); setError(err instanceof Error ? err.message : 'Could not save your session.');
@@ -91,7 +100,7 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
 
   useEffect(() => {
     if (ownerKeyRef.current !== storageKey) {
-      ownerKeyRef.current = storageKey; setCurrent(null); setSaved(false); setSavedLocally(false); setReflection(false); completedIdRef.current = null; completionFailedRef.current = false; bellPlayedRef.current = false
+      ownerKeyRef.current = storageKey; earlyNotesRef.current = null; setEndingEarly(false); setEndReason(''); setCurrent(null); setSaved(false); setSavedLocally(false); setReflection(false); completedIdRef.current = null; completionFailedRef.current = false; bellPlayedRef.current = false
     }
     if (!storageKey) { setCurrent(null); setSaved(false); setReflection(false); completedIdRef.current = null; return }
     try {
@@ -100,14 +109,16 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
       const item = JSON.parse(raw) as Stored
       if (!item.sessionId || !item.deadlineMs) return
       const validPaused = item.paused === true && Number.isFinite(item.pausedRemainingSeconds) && item.pausedRemainingSeconds! > 0 && item.pausedRemainingSeconds! <= item.plannedSeconds
-      const restored = { local: item.local, sessionId: item.sessionId, startedAt: item.startedAt, deadlineMs: item.deadlineMs, plannedSeconds: item.plannedSeconds, paused: validPaused, pausedRemainingSeconds: validPaused ? item.pausedRemainingSeconds : undefined }
+      earlyNotesRef.current = item.earlyCompletion?.notes ?? null
+      const restored = { earlyCompletion: item.earlyCompletion, local: item.local, sessionId: item.sessionId, startedAt: item.startedAt, deadlineMs: item.deadlineMs, plannedSeconds: item.plannedSeconds, paused: validPaused, pausedRemainingSeconds: validPaused ? item.pausedRemainingSeconds : undefined }
       setMinutes(Math.max(1, Math.min(120, Math.round(restored.plannedSeconds / 60)))); setCurrent(restored)
-      if (validPaused) setRemaining(item.pausedRemainingSeconds!)
+      if (item.completionPending && item.earlyCompletion) void completeNaturally(restored, false)
+      else if (validPaused) setRemaining(item.pausedRemainingSeconds!)
       else if (item.completionPending || item.deadlineMs <= Date.now()) void completeNaturally(restored, false)
     } catch { /* malformed local state is ignored */ }
   }, [storageKey, completeNaturally, setCurrent])
 
-  useEffect(() => { hydratedDraftKeyRef.current = null; completedIdRef.current = null; setSaved(false); setReflection(false); setDraft(EMPTY_DRAFT); if (!draftKey) return; try { const raw = storageGet(draftKey); const completedId = storageGet(reflectionSessionKey); if (raw) { const legacy = JSON.parse(raw) as Partial<Draft>; const notes = typeof legacy.notes === 'string' ? legacy.notes : combineJournalNotes(legacy); setDraft({ beforeMood: legacy.beforeMood ?? null, duringMood: legacy.duringMood ?? null, afterMood: legacy.afterMood ?? null, notes }) } if (completedId) { completedIdRef.current = completedId; setSaved(true); setRemaining(0) } } catch { /* optional */ } hydratedDraftKeyRef.current = draftKey }, [draftKey, reflectionSessionKey])
+  useEffect(() => { hydratedDraftKeyRef.current = null; completedIdRef.current = null; setSaved(false); setReflection(false); setDraft(EMPTY_DRAFT); if (!draftKey) return; try { const raw = storageGet(draftKey); const completedId = storageGet(reflectionSessionKey); if (raw) { const legacy = JSON.parse(raw) as Partial<Draft>; const notes = typeof legacy.notes === 'string' ? legacy.notes : combineJournalNotes(legacy); setDraft({ beforeMood: legacy.beforeMood ?? null, duringMood: legacy.duringMood ?? null, afterMood: legacy.afterMood ?? null, notes: earlyNotesRef.current ?? notes }) } else if (earlyNotesRef.current !== null) setDraft({ ...EMPTY_DRAFT, notes: earlyNotesRef.current }); if (completedId) { completedIdRef.current = completedId; setSaved(true); setRemaining(0) } } catch { /* optional */ } earlyNotesRef.current = null; hydratedDraftKeyRef.current = draftKey }, [draftKey, reflectionSessionKey])
   useEffect(() => { if (hydratedDraftKeyRef.current !== draftKey) return; storageSet(draftKey, JSON.stringify(draft)) }, [draft, draftKey])
   useEffect(() => {
     if (!active || active.paused) { releaseWakeLock(); return }
@@ -120,6 +131,14 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
   }, [active, acquireWakeLock, completeNaturally, releaseWakeLock])
   useEffect(() => () => releaseWakeLock(), [releaseWakeLock])
   useEffect(() => { onActiveChange?.(Boolean(active)) }, [active, onActiveChange])
+  useEffect(() => {
+    if (!endingEarly && !reflection) { setDialogViewport(null); return }
+    const viewport = window.visualViewport
+    const update = () => setDialogViewport({ height: viewport?.height ?? window.innerHeight, top: viewport?.offsetTop ?? 0 })
+    update(); viewport?.addEventListener('resize', update); viewport?.addEventListener('scroll', update); window.addEventListener('resize', update)
+    return () => { viewport?.removeEventListener('resize', update); viewport?.removeEventListener('scroll', update); window.removeEventListener('resize', update) }
+  }, [endingEarly, reflection])
+
   useEffect(() => {
     const update = () => { const hour = new Date().getHours(); setTimeOfDay(hour < 5 || hour >= 21 ? 'Late night sit' : hour < 9 ? 'Early morning sit' : hour < 12 ? 'Morning sit' : hour < 17 ? 'Afternoon sit' : 'Evening sit') }
     update(); const interval = window.setInterval(update, 60_000)
@@ -162,9 +181,24 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
     const next = { ...paused, paused: false, pausedRemainingSeconds: undefined, deadlineMs: Date.now() + seconds * 1000 }
     persist(next); setCurrent(next); setRemaining(seconds)
   }
-  async function cancel() {
-    cancelingRef.current = true; setBusy(true); setError('')
-    try { if (!active!.local) { const response = await fetch(`/api/sessions/${active!.sessionId}`, { method: 'DELETE' }); if (!response.ok) { const body = await jsonBody(response); throw new Error(body.error || 'Could not end this practice.') } }; persist(null); setCurrent(null); setRemaining(minutes * 60); releaseWakeLock() } catch (err) { cancelingRef.current = false; setError(err instanceof Error ? err.message : 'Could not end this practice.') } finally { setBusy(false) }
+  function requestEnd() {
+    cancelingRef.current = true; setError(''); setEndReason(''); setEndingEarly(true)
+  }
+  function resumeSit() {
+    cancelingRef.current = false; setEndingEarly(false); setEndReason(''); setError('')
+  }
+  async function confirmEnd() {
+    const session = activeRef.current!
+    try {
+      const reason = endReason.trim()
+      const notes = reason ? `Ended early: ${reason}${draft.notes ? `\n\n${draft.notes}` : ''}` : draft.notes
+      if (notes.length > 6500) throw new Error('Your reason and reflection notes must fit within 6,500 characters.')
+      const next = session.earlyCompletion ? session : { ...session, earlyCompletion: { elapsedSeconds: Math.max(0, session.plannedSeconds - session.pausedRemainingSeconds!), completedAt: new Date().toISOString(), notes } }
+      // Persist the confirmed ending before sending it so reloads/retries use the same duration and reason.
+      localStorage.setItem(storageKey!, JSON.stringify({ ...next, completionPending: true }))
+      setCurrent(next)
+      await completeNaturally(next)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save your session.') }
   }
   async function saveReflection() {
     const sessionId = activeRef.current?.sessionId
@@ -186,6 +220,7 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
     hydratedDraftKeyRef.current = null
     storageRemove(draftKey); storageRemove(reflectionSessionKey)
   }
+  const dialogStyle = dialogViewport ? { height: dialogViewport.height, top: dialogViewport.top, bottom: 'auto', '--dialog-viewport-height': `${dialogViewport.height}px` } as CSSProperties : undefined
   const displayRemaining = active ? remaining : saved ? 0 : minutes * 60
   const setMood = (key: 'beforeMood' | 'duringMood' | 'afterMood', value: Mood) => setDraft(current => ({ ...current, [key]: value }))
 
@@ -198,12 +233,13 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
       {saved && <div className="timer-label">Practice complete</div>}
       <TimerDial durationMinutes={active ? Math.round(active.plannedSeconds / 60) : minutes} remainingSeconds={displayRemaining} running={Boolean(active)} disabled={Boolean(active || saved)} onDurationChange={active || saved ? undefined : setMinutes} phaseLabel={saved ? 'well done' : active?.paused ? 'paused' : active ? 'remaining' : 'minutes'} />
       {!active && !saved && <button className="sound-preview" type="button" onClick={() => { unlockBowlAudio(); playBowl() }}>Preview sound</button>}
-      {active && <div className="timer-session-actions"><button className="secondary-button" onClick={active.paused ? resume : pause} disabled={busy}>{active.paused ? 'Resume' : 'Pause'}</button>{active.paused && <button className="text-button" onClick={() => void cancel()} disabled={busy}>End session early</button>}</div>}
+      {active && <div className="timer-session-actions"><button className="secondary-button" onClick={active.paused ? resume : pause} disabled={busy}>{active.paused ? 'Resume' : 'Pause'}</button>{active.paused && <button className="text-button" onClick={requestEnd} disabled={busy}>End session early</button>}</div>}
       {saved && <><button className="primary-button" onClick={() => setReflection(true)}>Record reflection <span>→</span></button><button className="text-button" onClick={beginNewSession}>New session</button></>}
       {!active && !saved && <button className="primary-button" onClick={() => void begin()} disabled={busy || disabled}>{busy ? 'Starting…' : user ? disabled ? 'Group practice active' : 'Begin practice' : 'Sign in to practice'} <span>→</span></button>}
       {savedLocally && <p role="status">Saved on this device. Your practice and reflection will sync when you reconnect.</p>}
-      {error && <p className="practice-error" role="alert">{error} {active && completionFailedRef.current && <button onClick={() => { completionFailedRef.current = false; void completeNaturally(active) }}>Retry save</button>}</p>}
+      {error && !endingEarly && <p className="practice-error" role="alert">{error} {active && completionFailedRef.current && <button onClick={() => { completionFailedRef.current = false; void completeNaturally(active) }}>Retry save</button>}</p>}
     </div>
-    {reflection && <div className="modal-backdrop"><div className="auth-modal reflection-modal" role="dialog" aria-modal="true"><div className="eyebrow">A moment to notice</div><h2>How did it feel?</h2><p>Your reflections are private. Only your practice duration appears in the Circle.</p>{([['beforeMood','Before'],['duringMood','During'],['afterMood','After']] as const).map(([key, label]) => <fieldset className="mood-field" key={key}><legend>{label}</legend><div className="mood-options">{([1,2,3,4,5] as Mood[]).map(value => <button type="button" key={value} className={draft[key] === value ? 'selected' : ''} onClick={() => setMood(key, value)} aria-label={`${label} ${value} of 5`}>{value}</button>)}</div><small>{draft[key] ? moodWords[draft[key]! - 1] : 'choose one'}</small></fieldset>)}<label className="reflection-note">Notes<textarea value={draft.notes} onChange={event => setDraft(current => ({ ...current, notes: event.target.value }))} maxLength={6500} rows={4} placeholder="What did you notice before, during, or after?" /></label>{reflectionError && <p className="form-error" role="alert">{reflectionError}</p>}<button className="primary-button" onClick={() => void saveReflection()} disabled={reflectionBusy}>{reflectionBusy ? 'Saving…' : 'Save reflection'} <span>→</span></button><button className="text-button" onClick={() => setReflection(false)}>Skip for now</button></div></div>}
+    {endingEarly && createPortal(<div className="modal-backdrop" style={dialogStyle}><div className="auth-modal early-end-modal" role="dialog" aria-modal="true" aria-labelledby="early-end-heading"><h2 id="early-end-heading">Why are you ending early?</h2><label className="reflection-note">Reason (optional)<textarea autoFocus value={endReason} disabled={busy || Boolean(active?.earlyCompletion)} onChange={event => setEndReason(event.target.value)} maxLength={1000} rows={3} /></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="early-end-actions"><button className="secondary-button" onClick={resumeSit} disabled={busy || Boolean(active?.earlyCompletion)}>Resume sit</button><button className="primary-button" onClick={() => void confirmEnd()} disabled={busy}>End session</button></div></div></div>, document.body)}
+    {reflection && createPortal(<div className="modal-backdrop" style={dialogStyle}><div className="auth-modal reflection-modal" role="dialog" aria-modal="true"><div className="eyebrow">A moment to notice</div><h2>How did it feel?</h2><p>Your reflections are private. Only your practice duration appears in the Circle.</p>{([['beforeMood','Before'],['duringMood','During'],['afterMood','After']] as const).map(([key, label]) => <fieldset className="mood-field" key={key}><legend>{label}</legend><div className="mood-options">{([1,2,3,4,5] as Mood[]).map(value => <button type="button" key={value} className={draft[key] === value ? 'selected' : ''} onClick={() => setMood(key, value)} aria-label={`${label} ${value} of 5`}>{value}</button>)}</div><small>{draft[key] ? moodWords[draft[key]! - 1] : 'choose one'}</small></fieldset>)}<label className="reflection-note">Notes<textarea value={draft.notes} onChange={event => setDraft(current => ({ ...current, notes: event.target.value }))} maxLength={6500} rows={4} placeholder="What did you notice before, during, or after?" /></label>{reflectionError && <p className="form-error" role="alert">{reflectionError}</p>}<button className="primary-button" onClick={() => void saveReflection()} disabled={reflectionBusy}>{reflectionBusy ? 'Saving…' : 'Save reflection'} <span>→</span></button><button className="text-button" onClick={() => setReflection(false)}>Skip for now</button></div></div>, document.body)}
   </section>
 }

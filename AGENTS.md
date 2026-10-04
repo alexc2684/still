@@ -56,8 +56,8 @@ Required prevention for layout/status/banner changes:
   visible viewport, above fixed navigation, and inside every clipping ancestor.
   Check `elementFromPoint` and activate it using actual touch coordinates.
 - Include Chromium and WebKit, iPhone safe areas, browser-height changes,
-  small phones, enlarged text, landscape, online/offline transitions, and
-  idle/running/paused actions. Use viewport screenshots, not only full-page
+  small phones, enlarged text, landscape, keyboard visual viewports,
+  online/offline transitions, and idle/running/paused actions. Use viewport screenshots, not only full-page
   screenshots, and inspect the bottom edge and every primary control.
 - Size decorative UI from its available container space, after banners and
   controls. Preserve a user-operable scroll fallback for smaller or enlarged

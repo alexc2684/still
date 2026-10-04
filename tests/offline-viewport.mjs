@@ -12,6 +12,7 @@ const cases = [
   { name: 'small-phone', width: 320, height: 568, top: 20, bottom: 0, initial: true },
   { name: 'large-text', width: 390, height: 844, top: 47, bottom: 34, textScale: 1.25 },
   { name: 'landscape', width: 844, height: 390, top: 0, bottom: 21 },
+  { name: 'keyboard', width: 390, height: 844, top: 47, bottom: 34, initial: true, keyboard: true },
 ]
 const engines = process.env.STILL_TEST_BROWSERS === 'chromium' ? { chromium } : { chromium, webkit }
 
@@ -20,7 +21,7 @@ async function actionGeometry(page, button) {
   return button.evaluate(element => {
     const box = element.getBoundingClientRect()
     const nav = document.querySelector('.bottom-nav').getBoundingClientRect()
-    let top = 0, bottom = Math.min(innerHeight, nav.top), left = 0, right = innerWidth
+    let top = visualViewport?.offsetTop ?? 0, bottom = (element.closest('[role=dialog]') ? Math.min(innerHeight, top + (visualViewport?.height ?? innerHeight)) : Math.min(innerHeight, nav.top)), left = 0, right = innerWidth
     for (let parent = element.parentElement; parent; parent = parent.parentElement) {
       const style = getComputedStyle(parent), rect = parent.getBoundingClientRect()
       if (/(auto|scroll|hidden|clip)/.test(style.overflowY)) { top = Math.max(top, rect.top); bottom = Math.min(bottom, rect.bottom) }
@@ -45,7 +46,8 @@ async function tapAction(page, button, requireInitial) {
   if (requireInitial) assert(geometry.visible && geometry.hit, `Action initially clipped: ${JSON.stringify(geometry)}`)
   if (!geometry.visible || !geometry.hit) {
     // A real wheel gesture tests the user's scrolling path; never scrollIntoView() or locator auto-scroll.
-    const panel = await page.locator('.solo-practice-panel').boundingBox()
+    const modal = page.locator('.modal-backdrop [role=dialog]')
+    const panel = await ((await modal.count()) ? modal : page.locator('.solo-practice-panel')).boundingBox()
     await page.mouse.move(panel.x + 10, panel.y + Math.min(panel.height / 2, 80))
     await page.mouse.wheel(0, 1500)
     await page.waitForTimeout(250)
@@ -108,9 +110,31 @@ for (const [engineName, engine] of Object.entries(engines)) {
         await page.setViewportSize({ width: scenario.width, height: Math.max(320, scenario.height - 100) })
         await tapAction(page, page.getByRole('button', { name: 'Pause', exact: true }))
         await tapAction(page, page.getByRole('button', { name: /End session early/ }))
+        await page.getByRole('dialog', { name: 'Why are you ending early?' }).waitFor()
+        if (scenario.keyboard) await page.evaluate(() => { Object.defineProperty(visualViewport, 'height', { configurable: true, value: 340 }); visualViewport.dispatchEvent(new Event('resize')) })
+        await page.screenshot({ path: `${output}/${engineName}-${scenario.name}-early-popup.png` })
+        await page.getByRole('textbox').fill('Not ending yet')
+        await tapAction(page, page.getByRole('button', { name: 'Resume sit', exact: true }), scenario.keyboard)
+        await page.getByRole('button', { name: 'Resume', exact: true }).waitFor()
+        if (scenario.keyboard) await page.evaluate(() => { delete visualViewport.height; visualViewport.dispatchEvent(new Event('resize')) })
+        assert.equal(await page.locator('.timer-dial').getAttribute('data-phase'), 'paused')
+        assert.equal(await page.evaluate(() => localStorage.getItem('still:outbox:00000000-0000-4000-8000-000000000002')), null)
+        await tapAction(page, page.getByRole('button', { name: /End session early/ }))
+        await page.getByRole('dialog', { name: 'Why are you ending early?' }).waitFor()
+        assert.equal(await page.getByRole('textbox').inputValue(), '')
+        if (scenario.keyboard) await page.evaluate(() => { Object.defineProperty(visualViewport, 'height', { configurable: true, value: 340 }); visualViewport.dispatchEvent(new Event('resize')) })
+        const reason = scenario.initial ? 'Need to leave' : ''
+        await page.getByRole('textbox').fill(reason)
+        await tapAction(page, page.getByRole('button', { name: 'End session', exact: true }), scenario.keyboard)
+        await page.getByText('How did it feel?').waitFor()
+        assert.equal(await page.getByRole('textbox').inputValue(), reason ? `Ended early: ${reason}` : '')
+        await page.screenshot({ path: `${output}/${engineName}-${scenario.name}-early-reflection.png` })
+        await tapAction(page, page.getByRole('button', { name: /Save reflection/ }))
         await page.getByRole('button', { name: /Begin practice/ }).waitFor()
+        const job = await page.evaluate(() => JSON.parse(localStorage.getItem('still:outbox:00000000-0000-4000-8000-000000000002'))[0])
+        assert(job.practice.endedEarly && job.practice.elapsedSeconds < job.practice.plannedSeconds)
         assert.equal(await page.evaluate(() => localStorage.getItem('still:practice:00000000-0000-4000-8000-000000000002')), null)
-        console.log(`PASS ${engineName} ${scenario.name}: offline Begin/Pause/Resume/End reachable using actual touch coordinates`)
+        console.log(`PASS ${engineName} ${scenario.name}: offline controls, early-ending popup, resume-to-pause, and reflection reachable using actual touch coordinates`)
       } catch (error) {
         await context.pages()[0]?.screenshot({ path: `${output}/${engineName}-${scenario.name}-failure.png` }).catch(() => undefined)
         throw error

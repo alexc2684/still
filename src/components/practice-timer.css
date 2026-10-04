@@ -35,3 +35,18 @@
 @media (max-width: 600px) and (max-height: 740px) {
   .practice-view .practice-timer-card { padding-top: 6px; }
 }
+.early-end-modal { max-height: min(90dvh, calc(var(--dialog-viewport-height, 100dvh) - max(20px, env(safe-area-inset-top, 0px)) - max(20px, env(safe-area-inset-bottom, 0px)))); overflow-y: auto; }
+.early-end-modal h2 { margin-top: 0; }
+.early-end-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.early-end-actions button { flex: 1; min-height: 44px; margin: 0; justify-content: center; }
+
+.reflection-modal { max-height: min(760px, 92dvh, calc(var(--dialog-viewport-height, 100dvh) - max(20px, env(safe-area-inset-top, 0px)) - max(20px, env(safe-area-inset-bottom, 0px)))); }
+
+.early-end-modal textarea, .reflection-modal textarea { font-size: 16px; }
+.modal-backdrop { container-type: size; container-name: dialog-viewport; }
+@container dialog-viewport (max-height: 420px) {
+  .early-end-modal { padding: 16px 23px; }
+  .early-end-modal h2 { font-size: 24px; }
+  .early-end-modal .reflection-note { margin: 12px 0 10px; }
+  .early-end-modal textarea { height: 64px; }
+}

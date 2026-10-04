@@ -297,3 +297,16 @@ describe('API branch boundaries', () => {
     }
   })
 })
+
+it('completes early solo sits with bounded actual elapsed time and a private reason, preserving idempotency and ownership',async()=>{
+  const {POST}=await import('@/app/api/sessions/[id]/complete/route')
+  const startedAt=new Date(Date.now()-10000).toISOString()
+  queue([{id:'early',user_id:user.id,planned_seconds:600,started_at:startedAt}], [{id:'early',elapsed_seconds:5,completed_date_text:'2026-10-04'}])
+  const result=await POST(req('POST',{endedEarly:true,elapsedSeconds:5,afterNote:'Ended early: Doorbell'}),ctx({id:'early'}));expect(result.status).toBe(200);expect(h.db.mock.calls.at(-1)![1][0]).toBe(5);expect(h.db.mock.calls.at(-1)![1][8]).toBe('Ended early: Doorbell')
+  queue([{id:'early',planned_seconds:600,started_at:startedAt}], [{id:'early',completed_date_text:'2026-10-04'}]);expect((await POST(req('POST',{endedEarly:true,elapsedSeconds:0}),ctx({id:'early'}))).status).toBe(200)
+  queue([{id:'early',planned_seconds:600,started_at:startedAt}]);expect((await POST(req('POST',{elapsedSeconds:5}),ctx({id:'early'}))).status).toBe(422)
+  queue([]);expect((await POST(req('POST',{endedEarly:true,elapsedSeconds:5}),ctx({id:'other-owner'}))).status).toBe(404)
+  queue([{shared_sit_id:'group'}]);expect((await POST(req('POST',{endedEarly:true,elapsedSeconds:5}),ctx({id:'group'}))).status).toBe(409)
+  h.db.mockClear();queue([{id:'early',completed_at:startedAt,elapsed_seconds:5}]);expect((await POST(req('POST',{endedEarly:true,elapsedSeconds:600}),ctx({id:'early'}))).status).toBe(200);expect(h.db).toHaveBeenCalledTimes(1)
+  expect((await POST(req('POST',{endedEarly:true,elapsedSeconds:1,afterNote:'x'.repeat(6501)}),ctx({id:'early'}))).status).toBe(400)
+})
