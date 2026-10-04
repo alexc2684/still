@@ -63,3 +63,7 @@ h2 { font-size: 19px; line-height: 1.2; letter-spacing: -.04em; font-weight: 600
 .bottom-nav { height: calc(72px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); }
 .auth-modal input, .comment-form input { font-size: 16px; }
 .practice-mode { display:flex; gap:7px; margin: 0 auto 12px; max-width: 760px; }.practice-mode button { min-height:44px; flex:1; border:1px solid var(--line); border-radius:7px; background:transparent; color:var(--muted); }.practice-mode button.selected { background:var(--ink); color:#fff; border-color:var(--ink); }
+.offline-notice { max-width: 760px; margin: 0 auto 20px; padding: 12px 16px; border-radius: 8px; background: #e8eee4; color: var(--sage-dark); font-size: 12px; line-height: 1.6; }
+.offline-notice .text-button { display: block; margin-top: 4px; padding: 0; }
+.offline-journal-notice { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0 0 16px; }
+button:disabled { cursor: default; opacity: .5; }

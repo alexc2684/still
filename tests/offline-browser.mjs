@@ -1,0 +1,41 @@
+import { chromium } from 'playwright'
+import assert from 'node:assert/strict'
+const browser = await chromium.launch({headless:true})
+const context = await browser.newContext({viewport:{width:390,height:844}})
+const user={id:'00000000-0000-4000-8000-000000000002',name:'Ada',email:'fixture@test',timezone:'UTC'}
+const uploads=[]
+await context.route('**/api/**',async route=>{
+  const path=new URL(route.request().url()).pathname
+  if(path==='/api/auth/me')return route.fulfill({json:{user}})
+  if(path==='/api/sessions/offline'){uploads.push(route.request().postDataJSON());return route.fulfill({json:{id:uploads.at(-1).id}})}
+  return route.fulfill({json:{sessions:[],practiceDates:[]}})
+})
+const page=await context.newPage()
+await page.goto('http://127.0.0.1:3217')
+await page.getByRole('button',{name:'Ada',exact:true}).waitFor()
+await page.evaluate(async()=>{await navigator.serviceWorker.ready;if(!navigator.serviceWorker.controller)await new Promise(resolve=>navigator.serviceWorker.addEventListener('controllerchange',resolve,{once:true}))})
+assert.equal(await page.evaluate(async()=>{const c=await caches.open('still-shell-v10');return (await c.keys()).filter(k=>k.url.includes('/_next/static/')).length>0}),true)
+await context.setOffline(true)
+await page.reload()
+await page.getByText(/Offline · Solo/).waitFor()
+await page.getByRole('button',{name:/Begin practice/}).click()
+await page.getByRole('button',{name:/End session early/}).waitFor()
+await page.reload()
+await page.getByRole('button',{name:/End session early/}).waitFor()
+// Simulate an elapsed timer through persisted state, then reopen offline.
+await page.evaluate(()=>{const key='still:practice:00000000-0000-4000-8000-000000000002';const sit=JSON.parse(localStorage.getItem(key));sit.startedAt=new Date(Date.now()-sit.plannedSeconds*1000-1000).toISOString();sit.deadlineMs=Date.now()-1000;localStorage.setItem(key,JSON.stringify(sit))})
+await page.reload()
+await page.getByRole('dialog').waitFor()
+await page.getByRole('textbox').fill('Private offline reflection')
+await page.getByRole('button',{name:/Save reflection/}).click()
+await page.getByRole('dialog').waitFor({state:'hidden'})
+await page.getByRole('button',{name:/Journal/,exact:false}).click()
+await page.getByText('Private offline reflection',{exact:true}).waitFor()
+await page.screenshot({path:'/tmp/still-offline-journal.png',fullPage:true})
+assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('still:outbox:00000000-0000-4000-8000-000000000002')).length),1)
+await context.setOffline(false)
+await page.waitForFunction(()=>JSON.parse(localStorage.getItem('still:outbox:00000000-0000-4000-8000-000000000002')).length===0)
+assert.equal(uploads.length,1)
+assert.equal(uploads[0].reflection.afterNote,'Private offline reflection')
+console.log('PASS: offline reload, local timer recovery, completion, reflection, journal, and reconnect upload (fixture API only)')
+await browser.close()

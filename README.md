@@ -55,3 +55,33 @@ Phone practice reminders are opt-in. The browser asks for notification
 permission only after the user taps Enable in Profile. Delivery runs hourly on
 the free public-repository GitHub Actions runner and is best effort around the
 chosen local hour; it does not promise exact-minute delivery.
+
+## Offline practice
+
+Open Still and sign in once while connected, then solo practice works offline,
+including reopening the app, recovering a running timer, completing a sit, and
+saving a private reflection. Journal shows locally completed sits and any
+history previously opened on that device; editing old journal entries requires
+a connection. Together, Circle, sign-in, and profile changes require a connection.
+
+Completed sessions and reflections stay in a per-account browser outbox and
+sync when Still is open and connected again. An expired login requires signing
+back into the original account; another account cannot receive the outbox.
+Retries reuse the session UUID, and the server records the original completion
+date in the account's timezone. Offline records remain on the device until an
+acknowledged upload; clearing browser/site data removes unsynced practice.
+The timer refuses to start offline if it cannot save its recovery state.
+
+The service worker caches the shell and its build-specific JavaScript/CSS on
+installation, excludes API responses and RSC requests from caching, and retains
+only Still's own current shell cache. Test offline behavior against a production
+build, not the dev server:
+
+```bash
+npm run build
+npm run start -- --hostname 127.0.0.1 --port 3217
+node tests/offline-browser.mjs
+```
+
+The browser regression uses fixture API responses and performs no real database
+writes. Phone background/locked-screen bell behavior still needs device checks.

@@ -108,7 +108,7 @@ async function loadServiceWorker(options: { fetch?: (request: Request) => Promis
   const deleted: string[] = []
   const notifications: any[] = []
   const clientsOpened: string[] = []
-  const cacheApi = { open: async () => ({ addAll: async (urls: string[]) => urls.forEach(url => cache.set(url, new Response(`cached:${url}`))), put: async (request: Request | string, response: Response) => { if (options.cachePut) options.cachePut(request, response); else cache.set(typeof request === 'string' ? request : request.url, response) }, match: async (request: Request | string) => options.cacheMatch?.(request) ?? cache.get(typeof request === 'string' ? request : request.url) }), keys: async () => options.cacheKeys ?? ['old-cache', 'still-shell-v9'], delete: async (key: string) => { deleted.push(key); return true }, match: async (request: Request | string) => options.cacheMatch?.(request) ?? cache.get(typeof request === 'string' ? request : request.url) }
+  const cacheApi = { open: async () => ({ addAll: async (urls: string[]) => urls.forEach(url => cache.set(url, new Response(`cached:${url}`))), put: async (request: Request | string, response: Response) => { if (options.cachePut) options.cachePut(request, response); else cache.set(typeof request === 'string' ? request : request.url, response) }, match: async (request: Request | string) => options.cacheMatch?.(request) ?? cache.get(typeof request === 'string' ? request : request.url) }), keys: async () => options.cacheKeys ?? ['other-app-cache', 'still-shell-v9', 'still-shell-v10'], delete: async (key: string) => { deleted.push(key); return true }, match: async (request: Request | string) => options.cacheMatch?.(request) ?? cache.get(typeof request === 'string' ? request : request.url) }
   const focused: { count: number } = { count: 0 }; const navigated: string[] = []
   const clients = { claim: async () => undefined, matchAll: async () => options.existingClients ?? [], openWindow: async (url: string) => { clientsOpened.push(url) } }
   for (const client of options.existingClients ?? []) { client.focus = async () => { focused.count += 1 }; client.navigate = async (url: string) => { navigated.push(url) } }
@@ -163,10 +163,10 @@ describe('service worker runtime', () => {
     // Navigation has no internal catch, so exercise the rejected promise explicitly.
     const failingNavigation = new Request('https://still.test/offline'); Object.defineProperty(failingNavigation, 'mode', { value: 'navigate' }); await expect(response(failingNavigation)).resolves.toMatchObject({ status: 200 })
     // Non-navigation cache hit, cacheable and non-cacheable misses, then a network rejection.
-    h.cache.set('https://still.test/cached', new Response('cached'))
-    expect((await response(new Request('https://still.test/cached')))?.status).toBe(200)
+    h.cache.set('https://still.test/_next/static/cached.js', new Response('cached'))
+    expect((await response(new Request('https://still.test/_next/static/cached.js')))?.status).toBe(200)
     expect((await response(new Request('https://still.test/_next/static/app.js')))?.status).toBe(200)
-    expect((await response(new Request('https://still.test/uncached')))?.status).toBe(200)
+    expect(await response(new Request('https://still.test/uncached'))).toBeUndefined()
     expect(await response(new Request('https://still.test/offline'))).toBeUndefined()
     expect(requests.length).toBeGreaterThan(0)
   })
@@ -176,7 +176,7 @@ describe('service worker runtime', () => {
     const install = eventWithWaitUntil(); h.listeners.install(install); await install.done()
     expect(h.cache.has('/')).toBe(true)
     const activate = eventWithWaitUntil(); h.listeners.activate(activate); await activate.done()
-    expect(h.deleted).toEqual(['old-cache'])
+    expect(h.deleted).toEqual(['still-shell-v9'])
   })
 
   it('bypasses API, non-GET, and foreign-origin requests', async () => {
@@ -190,6 +190,7 @@ describe('service worker runtime', () => {
 
   it('caches successful navigation and falls back to cached shell when offline', async () => {
     const h = await loadServiceWorker()
+    const install = eventWithWaitUntil(); h.listeners.install(install); await install.done()
     const online = eventWithWaitUntil({ request: new Request('https://still.test/journal', { headers: { accept: 'text/html' } }), respondWith: (promise: Promise<Response>) => { online.response = promise } }) as any
     Object.defineProperty(online.request, 'mode', { value: 'navigate' }); h.listeners.fetch(online); expect((await online.response).status).toBe(200)
     await new Promise(resolve => setTimeout(resolve, 0)); expect(h.cache.has('/')).toBe(true)
@@ -216,17 +217,17 @@ describe('service worker runtime', () => {
   it('loads the actual service-worker module with worker globals stubbed', async () => {
     const listeners: Record<string, (event: any) => void> = {}
     const cache = new Map<string, Response>()
-    let clientList: any[] = []; let failFetch = false; const deleted: string[] = []
-    const fakeCaches = { open: async () => ({ addAll: async (urls: string[]) => urls.forEach(url => cache.set(url, new Response(`cached:${url}`))), put: async (request: Request | string, response: Response) => cache.set(typeof request === 'string' ? request : request.url, response), match: async (request: Request | string) => cache.get(typeof request === 'string' ? request : request.url) }), keys: async () => ['old-cache', 'still-shell-v9'], delete: async (key: string) => { deleted.push(key); return true }, match: async (request: Request | string) => cache.get(typeof request === 'string' ? request : request.url) }
+    let clientList: any[] = []; let failFetch = false; let status = 200; const deleted: string[] = []
+    const fakeCaches = { open: async () => ({ addAll: async (urls: string[]) => urls.forEach(url => cache.set(url, new Response(url === '/' ? '<script src="/_next/static/app.js?q=1&amp;x=2"></script>' : `cached:${url}`))), put: async (request: Request | string, response: Response) => cache.set(typeof request === 'string' ? request : request.url, response), match: async (request: Request | string) => cache.get(typeof request === 'string' ? request : request.url) }), keys: async () => ['other-app-cache', 'still-shell-v9', 'still-shell-v10'], delete: async (key: string) => { deleted.push(key); return true }, match: async (request: Request | string) => cache.get(typeof request === 'string' ? request : request.url) }
     const fakeClients = { claim: async () => undefined, matchAll: async () => clientList, openWindow: async () => undefined }
     vi.stubGlobal('self', { location: { origin: 'https://still.test' }, registration: { showNotification: async () => undefined }, skipWaiting: async () => undefined, clients: fakeClients, addEventListener: (name: string, handler: (event: any) => void) => { listeners[name] = handler } })
-    vi.stubGlobal('clients', fakeClients); vi.stubGlobal('caches', fakeCaches); vi.stubGlobal('fetch', async () => { if (failFetch) throw new Error('offline'); return new Response('network', { status: 200 }) })
+    vi.stubGlobal('clients', fakeClients); vi.stubGlobal('caches', fakeCaches); vi.stubGlobal('fetch', async () => { if (failFetch) throw new Error('offline'); return new Response('network', { status }) })
     // @ts-expect-error The production worker is an intentionally classic script with no exports.
     await import('../public/sw.js')
     expect(Object.keys(listeners)).toEqual(expect.arrayContaining(['install', 'activate', 'push', 'notificationclick', 'fetch']))
     const waits: Promise<unknown>[] = []; listeners.install({ waitUntil: (promise: Promise<unknown>) => waits.push(promise) }); await Promise.all(waits); expect(cache.has('/')).toBe(true)
     const activateWaits: Promise<unknown>[] = []; listeners.activate({ waitUntil: (promise: Promise<unknown>) => activateWaits.push(promise) }); await Promise.all(activateWaits)
-    expect(deleted).toEqual(['old-cache'])
+    expect(deleted).toEqual(['still-shell-v9'])
     const pushWaits: Promise<unknown>[] = []; listeners.push({ data: { json: () => ({ title: 'QA', url: '/journal' }) }, waitUntil: (promise: Promise<unknown>) => pushWaits.push(promise) }); await Promise.all(pushWaits)
     const customPushWaits: Promise<unknown>[] = []; listeners.push({ data: { json: () => ({ title: 'Tagged', tag: 'tag', url: 'https://evil.test/x' }) }, waitUntil: (promise: Promise<unknown>) => customPushWaits.push(promise) }); await Promise.all(customPushWaits)
     const nullPushWaits: Promise<unknown>[] = []; listeners.push({ data: { json: () => null }, waitUntil: (promise: Promise<unknown>) => nullPushWaits.push(promise) }); await Promise.all(nullPushWaits)
@@ -238,7 +239,10 @@ describe('service worker runtime', () => {
     const emptyClickWaits: Promise<unknown>[] = []; listeners.notificationclick({ notification: { data: {}, close: () => undefined }, waitUntil: (promise: Promise<unknown>) => emptyClickWaits.push(promise) }); await Promise.all(emptyClickWaits)
     const openedWaits: Promise<unknown>[] = []; listeners.notificationclick({ notification: { data: { url: '/opened' }, close: () => undefined }, waitUntil: (promise: Promise<unknown>) => openedWaits.push(promise) }); await Promise.all(openedWaits)
     const fetchRun = async (request: Request) => { const waits: Promise<unknown>[] = []; listeners.fetch({ request, respondWith: (promise: Promise<unknown>) => waits.push(promise) }); return waits.length ? Promise.all(waits) : [] }
-    const navigation = new Request('https://still.test/journal'); Object.defineProperty(navigation, 'mode', { value: 'navigate' }); await fetchRun(navigation)
+    const navigation = new Request('https://still.test/'); Object.defineProperty(navigation, 'mode', { value: 'navigate' }); await fetchRun(navigation)
+    const otherNavigation = new Request('https://still.test/journal'); Object.defineProperty(otherNavigation, 'mode', { value: 'navigate' }); await fetchRun(otherNavigation)
+    status = 503; await fetchRun(navigation); await fetchRun(new Request('https://still.test/_next/static/error.js')); status = 200
+    failFetch = true; await fetchRun(new Request('https://still.test/_next/static/missing.js')); failFetch = false
     await fetchRun(new Request('https://still.test/manifest.webmanifest'))
     await fetchRun(new Request('https://still.test/new-resource'))
     failFetch = true; await fetchRun(new Request('https://still.test/offline')); failFetch = false
