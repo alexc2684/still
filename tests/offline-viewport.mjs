@@ -35,7 +35,7 @@ async function actionGeometry(page, button) {
     }
   })
 }
-async function tapAction(page, button, requireInitial) {
+async function revealAction(page, button, requireInitial) {
   await button.waitFor({ state: 'visible' })
   // Let React's parent activity callback and responsive layout settle before measuring touch coordinates.
   await page.evaluate(async () => {
@@ -58,6 +58,10 @@ async function tapAction(page, button, requireInitial) {
     console.log(await page.locator('.solo-practice-panel').evaluate(element => ({ scrollTop: element.scrollTop, scrollHeight: element.scrollHeight, clientHeight: element.clientHeight, overflow: getComputedStyle(element).overflowY, rect: element.getBoundingClientRect().toJSON(), viewport: { height: innerHeight, visual: visualViewport.height, scale: visualViewport.scale } })))
   }
   assert(geometry.visible && geometry.hit, `Action unreachable after user scroll: ${JSON.stringify(geometry)}`)
+  return geometry
+}
+async function tapAction(page, button, requireInitial) {
+  const geometry = await revealAction(page, button, requireInitial)
   await page.touchscreen.tap(geometry.x, geometry.y)
 }
 
@@ -128,8 +132,17 @@ for (const [engineName, engine] of Object.entries(engines)) {
         await tapAction(page, page.getByRole('button', { name: 'End session', exact: true }), scenario.keyboard)
         await page.getByText('How did it feel?').waitFor()
         assert.equal(await page.getByRole('textbox').inputValue(), reason ? `Ended early: ${reason}` : '')
+        const overlay = await page.locator('.modal-backdrop').evaluate(element => {
+          const rect = element.getBoundingClientRect(), visual = window.visualViewport
+          return { parent: element.parentElement?.tagName, top: rect.top, bottom: rect.bottom, expectedTop: visual?.offsetTop ?? 0, expectedBottom: (visual?.offsetTop ?? 0) + (visual?.height ?? innerHeight) }
+        })
+        assert.equal(overlay.parent, 'BODY', 'Reflection overlay must escape the clipped practice screen')
+        assert(Math.abs(overlay.top - overlay.expectedTop) < 1 && Math.abs(overlay.bottom - overlay.expectedBottom) < 1, `Backdrop does not cover the visible viewport: ${JSON.stringify(overlay)}`)
         await page.screenshot({ path: `${output}/${engineName}-${scenario.name}-early-reflection.png` })
-        await tapAction(page, page.getByRole('button', { name: /Save reflection/ }))
+        const save = page.getByRole('button', { name: /Save reflection/ })
+        const saveGeometry = await revealAction(page, save)
+        await page.screenshot({ path: `${output}/${engineName}-${scenario.name}-early-reflection-actions.png` })
+        await page.touchscreen.tap(saveGeometry.x, saveGeometry.y)
         await page.getByRole('button', { name: /Begin practice/ }).waitFor()
         const job = await page.evaluate(() => JSON.parse(localStorage.getItem('still:outbox:00000000-0000-4000-8000-000000000002'))[0])
         assert(job.practice.endedEarly && job.practice.elapsedSeconds < job.practice.plannedSeconds)

@@ -40,10 +40,19 @@
 .early-end-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .early-end-actions button { flex: 1; min-height: 44px; margin: 0; justify-content: center; }
 
+.early-end-modal, .reflection-modal {
+  min-height: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
+}
 .reflection-modal { max-height: min(760px, 92dvh, calc(var(--dialog-viewport-height, 100dvh) - max(20px, env(safe-area-inset-top, 0px)) - max(20px, env(safe-area-inset-bottom, 0px)))); }
 
 .early-end-modal textarea, .reflection-modal textarea { font-size: 16px; }
-.modal-backdrop { container-type: size; container-name: dialog-viewport; }
+.modal-backdrop { width: 100%; max-width: none; overflow: hidden; container-type: size; container-name: dialog-viewport; }
 @container dialog-viewport (max-height: 420px) {
   .early-end-modal { padding: 16px 23px; }
   .early-end-modal h2 { font-size: 24px; }
