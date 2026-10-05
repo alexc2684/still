@@ -56,15 +56,15 @@ describe('API regression boundaries', () => {
     expect(await status(POST(request(), params({ token: 'x' })))).toBe(403)
   })
 
-  it('handles reminder bearer auth, dry runs, and dispatch failures', async () => {
+  it('keeps reminder dispatch authenticated and retired', async () => {
     process.env.CRON_SECRET = 'secret'
     const route = await import('@/app/api/reminders/dispatch/route')
     expect(await status(route.POST(request()))).toBe(401)
     const good = new Request('https://still.test/api?dryRun=1', { method: 'POST', headers: { authorization: 'Bearer secret' } })
-    expect(await status(route.POST(good))).toBe(200)
-    dispatch.mockRejectedValueOnce(new Error('db down'))
-    const body = await route.POST(new Request('https://still.test/api', { method: 'POST', headers: { authorization: 'Bearer secret' } }))
-    expect(body.status).toBe(500)
+    const response = await route.POST(good)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ due: 0, sent: 0, failed: 0, removed: 0, skipped: 0, retired: true })
+    expect(dispatch).not.toHaveBeenCalled()
   })
 
   it('returns database failures as stable API errors', async () => {
