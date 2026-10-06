@@ -10,6 +10,7 @@ export type TimerDialProps = {
   onDurationChange?: (minutes: number) => void
   phaseLabel?: string
   running?: boolean
+  displayText?: string
 }
 
 const RADIUS = 126
@@ -17,7 +18,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 function clampMinutes(value: number) { return Math.max(1, Math.min(120, Math.round(value))) }
 function formatTime(seconds: number) { return `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}` }
 
-export default function TimerDial({ durationMinutes, remainingSeconds, disabled = false, onDurationChange, phaseLabel, running = false }: TimerDialProps) {
+export default function TimerDial({ durationMinutes, remainingSeconds, disabled = false, onDurationChange, phaseLabel, running = false, displayText }: TimerDialProps) {
   const dialRef = useRef<HTMLDivElement>(null)
   const pointerRef = useRef<{ id: number; angle: number; exactMinutes: number } | null>(null)
   const total = durationMinutes * 60
@@ -67,7 +68,7 @@ export default function TimerDial({ durationMinutes, remainingSeconds, disabled 
     <svg viewBox="0 0 280 280" aria-hidden="true">
       <circle className="timer-dial-face" cx="140" cy="140" r="111" />
       <g className="timer-dial-ticks">{Array.from({ length: 60 }, (_, index) => <line key={index} x1="140" y1={index % 5 === 0 ? 39 : 35} x2="140" y2="30" transform={`rotate(${index * 6} 140 140)`} className={index % 5 === 0 ? 'major' : ''} />)}</g><circle className="timer-dial-track" cx="140" cy="140" r={RADIUS} /><circle key={running ? 'countdown' : 'duration'} className="timer-dial-progress" cx="140" cy="140" r={RADIUS} strokeDasharray={CIRCUMFERENCE} strokeDashoffset={CIRCUMFERENCE * (1 - firstProgress)} />{!running && durationMinutes > 60 && <circle className="timer-dial-progress timer-dial-progress-second" cx="140" cy="140" r="116" strokeDasharray={2 * Math.PI * 116} strokeDashoffset={2 * Math.PI * 116 * (1 - secondProgress)} />}{onDurationChange && <circle className="timer-dial-thumb" cx={thumbX} cy={thumbY} r="7" />}</svg>
-    <div className="timer-dial-center"><strong>{formatTime(remainingSeconds)}</strong><span>{phaseLabel || (remainingSeconds === 0 ? 'well done' : 'remaining')}</span>{interactive && durationMinutes > 60 && <small>second revolution</small>}</div>
+    <div className="timer-dial-center"><strong>{displayText ?? formatTime(remainingSeconds)}</strong><span>{phaseLabel || (remainingSeconds === 0 ? 'well done' : 'remaining')}</span>{interactive && durationMinutes > 60 && <small>second revolution</small>}</div>
     {interactive && <div className="timer-dial-slider" role="slider" tabIndex={0} aria-label="Duration in minutes" aria-valuemin={1} aria-valuemax={120} aria-valuenow={durationMinutes} aria-valuetext={`${durationMinutes} minutes`} onKeyDown={onKeyDown} />}
   </div>
 }

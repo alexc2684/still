@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     const b = input.parse(await req.json())
     if (b.userId !== user.id) return json({ error: 'Account mismatch' }, 403)
     const start = Date.parse(b.startedAt), end = Date.parse(b.completedAt), elapsed = b.elapsedSeconds ?? b.plannedSeconds
-    if (end > Date.now() + 5000 || end < start || elapsed > b.plannedSeconds || end - start < elapsed * 1000 || (!b.endedEarly && elapsed < b.plannedSeconds)) return json({ error: 'Invalid practice duration' }, 422)
+    if (end > Date.now() + 5000 || end < start || end - start < elapsed * 1000 || (!b.endedEarly && elapsed < b.plannedSeconds)) return json({ error: 'Invalid practice duration' }, 422)
     const r = b.reflection
     // One atomic statement: retries use the same UUID; other owners and shared sits cannot be changed.
     const rows = await sql()(`WITH saved AS (

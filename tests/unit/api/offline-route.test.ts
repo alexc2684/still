@@ -28,3 +28,8 @@ it('imports early endings with actual time, including zero seconds, without chan
   expect(h.db.mock.calls.at(-1)![0]).toContain('CASE WHEN meditation_sessions.completed_at IS NULL')
   for(const extra of [{endedEarly:false,elapsedSeconds:10},{endedEarly:true,elapsedSeconds:61},{endedEarly:true,elapsedSeconds:-1},{endedEarly:true,elapsedSeconds:11,completedAt:'2026-01-01T12:00:10.000Z'},{endedEarly:true,elapsedSeconds:0,completedAt:'2026-01-01T11:59:59.000Z'}]) expect((await POST(request({...payload,...extra}))).status).toBe(extra.elapsedSeconds===-1?400:422)
 })
+it('imports overtime only when the recorded wall time proves the full elapsed duration',async()=>{
+  const overtime={...payload,completedAt:'2026-01-01T12:01:10.000Z',elapsedSeconds:70}
+  expect((await POST(request(overtime))).status).toBe(200);expect(h.db.mock.calls.at(-1)![1][10]).toBe(70)
+  expect((await POST(request({...overtime,completedAt:'2026-01-01T12:01:09.000Z'}))).status).toBe(422)
+})

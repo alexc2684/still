@@ -36,13 +36,13 @@ describe('PracticeTimer recovery boundaries', () => {
     render(<PracticeTimer user={user} />); await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()); expect(screen.queryByText('paused')).not.toBeInTheDocument()
   })
 
-  it('does not pause after the deadline has elapsed', async () => {
+  it('pauses after the deadline so overtime remains frozen', async () => {
     const now = Date.now(); localStorage.setItem('still:practice:recovery-user', JSON.stringify({ sessionId: 'just-expired', startedAt: new Date(now - 1000).toISOString(), deadlineMs: now + 60_000, plannedSeconds: 60 }))
-    render(<PracticeTimer user={user} />); const pause = await screen.findByRole('button', { name: 'Pause' }); vi.spyOn(Date, 'now').mockReturnValue(now + 60_001); fireEvent.click(pause); expect(screen.queryByText('paused')).not.toBeInTheDocument()
+    render(<PracticeTimer user={user} />); const pause = await screen.findByRole('button', { name: 'Pause' }); vi.spyOn(Date, 'now').mockReturnValue(now + 61_001); fireEvent.click(pause); expect(screen.getByText('paused')).toBeInTheDocument(); expect(JSON.parse(localStorage.getItem('still:practice:recovery-user')!).pausedRemainingSeconds).toBe(-1)
   })
 
   it('restores a completion-pending session and retries its completion', async () => {
-    const now = Date.now(); localStorage.setItem('still:practice:recovery-user', JSON.stringify({ sessionId: 'pending', startedAt: new Date(now - 60_000).toISOString(), deadlineMs: now + 60_000, plannedSeconds: 60, completionPending: true }))
+    const now = Date.now(); localStorage.setItem('still:practice:recovery-user', JSON.stringify({ sessionId: 'pending', startedAt: new Date(now - 61_000).toISOString(), deadlineMs: now - 1000, plannedSeconds: 60, completionPending: true, stoppedCompletion: { elapsedSeconds: 61, completedAt: new Date(now).toISOString() } }))
     vi.mocked(fetch).mockResolvedValueOnce(reply({}))
     render(<PracticeTimer user={user} />)
     await waitFor(() => expect(screen.getByText('well done')).toBeInTheDocument())
@@ -94,11 +94,30 @@ describe('PracticeTimer recovery boundaries', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument())
   })
 
+  it('does not let an old account completion overwrite a newly active account, even after switching back', async () => {
+    const now = Date.now()
+    localStorage.setItem('still:practice:recovery-user', JSON.stringify({ sessionId: 'account-a', startedAt: new Date(now - 65_000).toISOString(), deadlineMs: now - 5000, plannedSeconds: 60, plannedBellPlayed: true }))
+    localStorage.setItem('still:practice:other-user', JSON.stringify({ sessionId: 'account-b', startedAt: new Date(now).toISOString(), deadlineMs: now + 60_000, plannedSeconds: 60 }))
+    let resolve!: (response: Response) => void
+    vi.mocked(fetch).mockReturnValueOnce(new Promise<Response>(done => { resolve = done }))
+    const view = render(<PracticeTimer user={user} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop' }))
+    view.rerender(<PracticeTimer user={{ id: 'other-user' }} />)
+    expect(await screen.findByRole('button', { name: 'Pause' })).toBeInTheDocument()
+    view.rerender(<PracticeTimer user={user} />)
+    expect(await screen.findByRole('button', { name: /Retry save/ })).toBeInTheDocument()
+    resolve(reply({}))
+    await Promise.resolve()
+    expect(screen.getByRole('button', { name: /Retry save/ })).toBeInTheDocument()
+    expect(localStorage.getItem('still:practice:recovery-user')).toContain('account-a')
+  })
+
   it('uses generic completion and cancellation messages when error bodies are empty', async () => {
-    const now = Date.now(); localStorage.setItem('still:practice:recovery-user', JSON.stringify({ sessionId: 'generic-complete', startedAt: new Date(now - 60_000).toISOString(), deadlineMs: now + 60_000, plannedSeconds: 60, completionPending: true }))
+    const now = Date.now(); localStorage.setItem('still:practice:recovery-user', JSON.stringify({ sessionId: 'generic-complete', startedAt: new Date(now - 61_000).toISOString(), deadlineMs: now - 1000, plannedSeconds: 60, completionPending: true, stoppedCompletion: { elapsedSeconds: 61, completedAt: new Date(now).toISOString() } }))
     vi.mocked(fetch).mockResolvedValueOnce(reply({}, false))
     render(<PracticeTimer user={user} />)
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Still could not save the completed session.'))
+    expect(screen.getByText('+00:01')).toBeInTheDocument(); expect(screen.queryByRole('button', { name: /Pause|Resume|Stop/ })).toBeNull()
     cleanup(); localStorage.clear(); vi.mocked(fetch).mockReset(); vi.mocked(fetch).mockResolvedValueOnce(reply({ session: { id: 'cancel-generic', startedAt: new Date().toISOString(), plannedSeconds: 60 } })).mockResolvedValueOnce(reply({}, false))
     const ui = userEvent.setup(); render(<PracticeTimer user={user} />); await ui.click(screen.getByRole('button', { name: /Begin practice/ })); await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()); await ui.click(screen.getByRole('button', { name: 'Pause' })); await ui.click(screen.getByRole('button', { name: /End session/ })); await ui.click(screen.getByRole('button', { name: 'End session' })); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Still could not save the completed session.'))
   })
@@ -118,13 +137,13 @@ it('keeps a stored reflection closed on launch and after skipping and reopening 
   expect(screen.getByDisplayValue('Keep this private draft')).toBeInTheDocument()
   expect(fetch).not.toHaveBeenCalled()
 })
-it('recovers an overdue session on launch without interrupting with a reflection', async () => {
+it('recovers an overdue session as active overtime without posting or interrupting with a reflection', async () => {
   localStorage.setItem('still:practice:recovery-user', JSON.stringify({ sessionId: 'overdue', startedAt: new Date(Date.now() - 120000).toISOString(), deadlineMs: Date.now() - 60000, plannedSeconds: 60 }))
   vi.mocked(fetch).mockResolvedValue(reply({}))
   render(<PracticeTimer user={user} />)
-  await screen.findByRole('button', { name: /Record reflection/ })
+  await screen.findByRole('button', { name: 'Stop' })
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  expect(fetch).toHaveBeenCalledWith('/api/sessions/overdue/complete', expect.anything())
+  expect(fetch).not.toHaveBeenCalled()
 })
 it('does not expose a restored draft when switching to a different signed-in account', async () => {
   localStorage.setItem('still:reflection-session:recovery-user', 'private-session')

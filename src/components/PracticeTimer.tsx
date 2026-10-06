@@ -30,6 +30,8 @@ type ActivePractice = {
   paused?: boolean
   pausedRemainingSeconds?: number
   earlyCompletion?: { elapsedSeconds: number; completedAt: string; notes: string }
+  stoppedCompletion?: { elapsedSeconds: number; completedAt: string }
+  plannedBellPlayed?: boolean
 }
 type Draft = { beforeMood: Mood | null; duringMood: Mood | null; afterMood: Mood | null; notes: string; beforeNote?: string; duringNote?: string; afterNote?: string }
 type Stored = ActivePractice & { completionPending?: boolean }
@@ -61,6 +63,7 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
   const [timeOfDay, setTimeOfDay] = useState('Time to sit')
   const earlyNotesRef = useRef<string | null>(null)
   const ownerKeyRef = useRef<string | null>(null)
+  const ownerGenerationRef = useRef(0)
   const activeRef = useRef<ActivePractice | null>(null)
   const completedIdRef = useRef<string | null>(null)
   const completingRef = useRef(false)
@@ -77,30 +80,36 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
 
   const completeNaturally = useCallback(async (session: ActivePractice, prompt = true) => {
     if (completingRef.current) return
+    const ownerGeneration = ownerGenerationRef.current
     completingRef.current = true; setBusy(true); setError('')
     const early = session.earlyCompletion
-    const payload = early ? { elapsedSeconds: early.elapsedSeconds, endedEarly: true, afterNote: early.notes } : { elapsedSeconds: session.plannedSeconds }
+    const stopped = session.stoppedCompletion
+    const completion = early ?? stopped!
+    const elapsedSeconds = completion.elapsedSeconds
+    const completedAt = completion.completedAt
+    const payload = early ? { elapsedSeconds, endedEarly: true, afterNote: early.notes } : { elapsedSeconds }
     try {
       if (session.local || offline || navigator.onLine === false) {
-        queueOfflineJob(user!.id, { id: session.sessionId, practice: { id: session.sessionId, startedAt: session.startedAt, plannedSeconds: session.plannedSeconds, completedAt: early?.completedAt ?? new Date(session.deadlineMs).toISOString(), ...(early ? { elapsedSeconds: early.elapsedSeconds, endedEarly: true } : {}) }, ...(early ? { reflection: { afterNote: early.notes } } : {}) })
+        queueOfflineJob(user!.id, { id: session.sessionId, practice: { id: session.sessionId, startedAt: session.startedAt, plannedSeconds: session.plannedSeconds, completedAt, elapsedSeconds, ...(early ? { endedEarly: true } : {}) }, ...(early ? { reflection: { afterNote: early.notes } } : {}) })
         setSavedLocally(true)
       } else {
         let response = await fetch(`/api/sessions/${session.sessionId}/complete`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         // A server clock can be just ahead of this device by one second.
-        if (response.status === 422) { await new Promise(resolve => window.setTimeout(resolve, 1200)); response = await fetch(`/api/sessions/${session.sessionId}/complete`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }) }
+        if (response.status === 422) { await new Promise(resolve => window.setTimeout(resolve, 1200)); if (ownerGenerationRef.current !== ownerGeneration) return; response = await fetch(`/api/sessions/${session.sessionId}/complete`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }) }
         if (!response.ok) { const body = await jsonBody(response); throw new Error(body.error || 'Still could not save the completed session.') }
       }
+      if (ownerGenerationRef.current !== ownerGeneration) return
       if (early) setDraft(current => ({ ...current, notes: early.notes }))
       setEndingEarly(false); setEndReason('')
       completedIdRef.current = session.sessionId; storageSet(reflectionSessionKey, session.sessionId); persist(null); setCurrent(null); setRemaining(0); setSaved(true); setReflection(prompt); onSessionSaved?.(); releaseWakeLock()
     } catch (err) {
-      completionFailedRef.current = true; persist({ ...session, completionPending: true }); setError(err instanceof Error ? err.message : 'Could not save your session.');
-    } finally { completingRef.current = false; setBusy(false) }
-  }, [onSessionSaved, persist, reflectionSessionKey, releaseWakeLock, user, offline])
+      if (ownerGenerationRef.current === ownerGeneration) { completionFailedRef.current = true; persist({ ...session, completionPending: true }); setError(err instanceof Error ? err.message : 'Could not save your session.') }
+    } finally { if (ownerGenerationRef.current === ownerGeneration) { completingRef.current = false; setBusy(false) } }
+  }, [onSessionSaved, persist, reflectionSessionKey, releaseWakeLock, storageKey, user, offline])
 
   useEffect(() => {
     if (ownerKeyRef.current !== storageKey) {
-      ownerKeyRef.current = storageKey; earlyNotesRef.current = null; setEndingEarly(false); setEndReason(''); setCurrent(null); setSaved(false); setSavedLocally(false); setReflection(false); completedIdRef.current = null; completionFailedRef.current = false; bellPlayedRef.current = false
+      ownerKeyRef.current = storageKey; ownerGenerationRef.current += 1; completingRef.current = false; earlyNotesRef.current = null; setEndingEarly(false); setEndReason(''); setCurrent(null); setSaved(false); setSavedLocally(false); setReflection(false); setBusy(false); setError(''); completedIdRef.current = null; completionFailedRef.current = false; bellPlayedRef.current = false
     }
     if (!storageKey) { setCurrent(null); setSaved(false); setReflection(false); completedIdRef.current = null; return }
     try {
@@ -108,27 +117,29 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
       if (!raw) return
       const item = JSON.parse(raw) as Stored
       if (!item.sessionId || !item.deadlineMs) return
-      const validPaused = item.paused === true && Number.isFinite(item.pausedRemainingSeconds) && item.pausedRemainingSeconds! > 0 && item.pausedRemainingSeconds! <= item.plannedSeconds
+      const validPaused = item.paused === true && Number.isFinite(item.pausedRemainingSeconds) && item.pausedRemainingSeconds! <= item.plannedSeconds
       earlyNotesRef.current = item.earlyCompletion?.notes ?? null
-      const restored = { earlyCompletion: item.earlyCompletion, local: item.local, sessionId: item.sessionId, startedAt: item.startedAt, deadlineMs: item.deadlineMs, plannedSeconds: item.plannedSeconds, paused: validPaused, pausedRemainingSeconds: validPaused ? item.pausedRemainingSeconds : undefined }
+      const restored = { earlyCompletion: item.earlyCompletion, stoppedCompletion: item.stoppedCompletion, plannedBellPlayed: item.plannedBellPlayed, local: item.local, sessionId: item.sessionId, startedAt: item.startedAt, deadlineMs: item.deadlineMs, plannedSeconds: item.plannedSeconds, paused: validPaused, pausedRemainingSeconds: validPaused ? item.pausedRemainingSeconds : undefined }
+      bellPlayedRef.current = Boolean(item.plannedBellPlayed)
       setMinutes(Math.max(1, Math.min(120, Math.round(restored.plannedSeconds / 60)))); setCurrent(restored)
       if (item.completionPending && item.earlyCompletion) void completeNaturally(restored, false)
+      else if (item.completionPending && item.stoppedCompletion) { setRemaining(item.plannedSeconds - item.stoppedCompletion.elapsedSeconds); void completeNaturally(restored, true) }
       else if (validPaused) setRemaining(item.pausedRemainingSeconds!)
-      else if (item.completionPending || item.deadlineMs <= Date.now()) void completeNaturally(restored, false)
+      else setRemaining(Math.ceil((item.deadlineMs - Date.now()) / 1000))
     } catch { /* malformed local state is ignored */ }
   }, [storageKey, completeNaturally, setCurrent])
 
   useEffect(() => { hydratedDraftKeyRef.current = null; completedIdRef.current = null; setSaved(false); setReflection(false); setDraft(EMPTY_DRAFT); if (!draftKey) return; try { const raw = storageGet(draftKey); const completedId = storageGet(reflectionSessionKey); if (raw) { const legacy = JSON.parse(raw) as Partial<Draft>; const notes = typeof legacy.notes === 'string' ? legacy.notes : combineJournalNotes(legacy); setDraft({ beforeMood: legacy.beforeMood ?? null, duringMood: legacy.duringMood ?? null, afterMood: legacy.afterMood ?? null, notes: earlyNotesRef.current ?? notes }) } else if (earlyNotesRef.current !== null) setDraft({ ...EMPTY_DRAFT, notes: earlyNotesRef.current }); if (completedId) { completedIdRef.current = completedId; setSaved(true); setRemaining(0) } } catch { /* optional */ } earlyNotesRef.current = null; hydratedDraftKeyRef.current = draftKey }, [draftKey, reflectionSessionKey])
   useEffect(() => { if (hydratedDraftKeyRef.current !== draftKey) return; storageSet(draftKey, JSON.stringify(draft)) }, [draft, draftKey])
   useEffect(() => {
-    if (!active || active.paused) { releaseWakeLock(); return }
+    if (!active || active.paused || active.stoppedCompletion) { releaseWakeLock(); return }
     void acquireWakeLock()
-    const tick = () => { const next = Math.max(0, Math.ceil((active.deadlineMs - Date.now()) / 1000)); setRemaining(next); if (next <= 0 && !cancelingRef.current && activeRef.current?.sessionId === active.sessionId) { if (!bellPlayedRef.current) { bellPlayedRef.current = true; playBowl() } if (!completionFailedRef.current) void completeNaturally(active) } }
+    const tick = () => { const next = Math.ceil((active.deadlineMs - Date.now()) / 1000); setRemaining(next); if (next <= 0 && activeRef.current?.sessionId === active.sessionId && !bellPlayedRef.current) { bellPlayedRef.current = true; const updated = { ...activeRef.current, plannedBellPlayed: true }; persist(updated); setCurrent(updated); playBowl() } }
     tick(); const id = window.setInterval(tick, 250)
     const visibility = () => { if (document.visibilityState === 'visible') void acquireWakeLock() }
     document.addEventListener('visibilitychange', visibility)
     return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', visibility) }
-  }, [active, acquireWakeLock, completeNaturally, releaseWakeLock])
+  }, [active, acquireWakeLock, persist, releaseWakeLock, setCurrent])
   useEffect(() => () => releaseWakeLock(), [releaseWakeLock])
   useEffect(() => { onActiveChange?.(Boolean(active)) }, [active, onActiveChange])
   useEffect(() => {
@@ -169,8 +180,7 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
   }
   function pause() {
     const running = active!
-    const pausedRemainingSeconds = Math.max(0, Math.ceil((running.deadlineMs - Date.now()) / 1000))
-    if (pausedRemainingSeconds <= 0) return
+    const pausedRemainingSeconds = Math.ceil((running.deadlineMs - Date.now()) / 1000)
     const next = { ...running, paused: true, pausedRemainingSeconds }
     persist(next); setCurrent(next); setRemaining(pausedRemainingSeconds); releaseWakeLock()
   }
@@ -183,6 +193,18 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
   }
   function requestEnd() {
     cancelingRef.current = true; setError(''); setEndReason(''); setEndingEarly(true)
+  }
+  async function stopOvertime() {
+    const session = activeRef.current!
+    if (session.stoppedCompletion) { await completeNaturally(session); return }
+    try {
+      const completedAt = new Date().toISOString()
+      const offset = session.paused ? session.pausedRemainingSeconds! : Math.ceil((session.deadlineMs - Date.now()) / 1000)
+      const next = { ...session, stoppedCompletion: { elapsedSeconds: Math.max(session.plannedSeconds, session.plannedSeconds - offset), completedAt } }
+      localStorage.setItem(storageKey!, JSON.stringify({ ...next, completionPending: true }))
+      setCurrent(next); setRemaining(offset)
+      await completeNaturally(next)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save your session.') }
   }
   function resumeSit() {
     cancelingRef.current = false; setEndingEarly(false); setEndReason(''); setError('')
@@ -221,7 +243,8 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
     storageRemove(draftKey); storageRemove(reflectionSessionKey)
   }
   const dialogStyle = dialogViewport ? { height: dialogViewport.height, top: dialogViewport.top, bottom: 'auto', '--dialog-viewport-height': `${dialogViewport.height}px` } as CSSProperties : undefined
-  const displayRemaining = active ? remaining : saved ? 0 : minutes * 60
+  const displayRemaining = active ? Math.max(0, remaining) : saved ? 0 : minutes * 60
+  const overtime = active ? Math.max(0, -remaining) : 0
   const setMood = (key: 'beforeMood' | 'duringMood' | 'afterMood', value: Mood) => setDraft(current => ({ ...current, [key]: value }))
 
   return <section className="practice-view" aria-labelledby="practice-heading">
@@ -231,9 +254,9 @@ export default function PracticeTimer({ user, onSessionSaved, onSignIn, onActive
     </div>
     <div className={`timer-card practice-timer-card ${active ? 'is-running' : ''} ${saved ? 'is-complete' : ''}`}>
       {saved && <div className="timer-label">Practice complete</div>}
-      <TimerDial durationMinutes={active ? Math.round(active.plannedSeconds / 60) : minutes} remainingSeconds={displayRemaining} running={Boolean(active)} disabled={Boolean(active || saved)} onDurationChange={active || saved ? undefined : setMinutes} phaseLabel={saved ? 'well done' : active?.paused ? 'paused' : active ? 'remaining' : 'minutes'} />
+      <TimerDial durationMinutes={active ? Math.max(1, Math.round(active.plannedSeconds / 60)) : minutes} remainingSeconds={displayRemaining} running={Boolean(active)} disabled={Boolean(active || saved)} onDurationChange={active || saved ? undefined : setMinutes} phaseLabel={saved ? 'well done' : active?.paused ? 'paused' : active ? remaining <= 0 ? 'overtime' : 'remaining' : 'minutes'} displayText={active && remaining <= 0 ? `+${Math.floor(overtime / 60).toString().padStart(2, '0')}:${(overtime % 60).toString().padStart(2, '0')}` : undefined} />
       {!active && !saved && <button className="sound-preview" type="button" onClick={() => { unlockBowlAudio(); playBowl() }}>Preview sound</button>}
-      {active && <div className="timer-session-actions"><button className="secondary-button" onClick={active.paused ? resume : pause} disabled={busy}>{active.paused ? 'Resume' : 'Pause'}</button>{active.paused && <button className="text-button" onClick={requestEnd} disabled={busy}>End session early</button>}</div>}
+      {active && !active.stoppedCompletion && <div className="timer-session-actions"><button className="secondary-button" onClick={active.paused ? resume : pause} disabled={busy}>{active.paused ? 'Resume' : 'Pause'}</button>{remaining <= 0 ? <button className="primary-button" onClick={() => void stopOvertime()} disabled={busy}>Stop</button> : active.paused && <button className="text-button" onClick={requestEnd} disabled={busy}>End session early</button>}</div>}
       {saved && <><button className="primary-button" onClick={() => setReflection(true)}>Record reflection <span>→</span></button><button className="text-button" onClick={beginNewSession}>New session</button></>}
       {!active && !saved && <button className="primary-button" onClick={() => void begin()} disabled={busy || disabled}>{busy ? 'Starting…' : user ? disabled ? 'Group practice active' : 'Begin practice' : 'Sign in to practice'} <span>→</span></button>}
       {savedLocally && <p role="status">Saved on this device. Your practice and reflection will sync when you reconnect.</p>}

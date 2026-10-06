@@ -31,6 +31,7 @@ await page.getByRole('button',{name:'Resume',exact:true}).click()
 // Simulate an elapsed timer through persisted state, then reopen offline.
 await page.evaluate(()=>{const key='still:practice:00000000-0000-4000-8000-000000000002';const sit=JSON.parse(localStorage.getItem(key));sit.startedAt=new Date(Date.now()-sit.plannedSeconds*1000-1000).toISOString();sit.deadlineMs=Date.now()-1000;localStorage.setItem(key,JSON.stringify(sit))})
 await page.reload()
+await page.getByRole('button',{name:'Stop',exact:true}).click()
 await page.getByRole('button',{name:/Record reflection/}).click()
 await page.getByRole('dialog').waitFor()
 await page.getByRole('textbox').fill('Private offline reflection')

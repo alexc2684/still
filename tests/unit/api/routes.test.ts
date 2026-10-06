@@ -310,3 +310,9 @@ it('completes early solo sits with bounded actual elapsed time and a private rea
   h.db.mockClear();queue([{id:'early',completed_at:startedAt,elapsed_seconds:5}]);expect((await POST(req('POST',{endedEarly:true,elapsedSeconds:600}),ctx({id:'early'}))).status).toBe(200);expect(h.db).toHaveBeenCalledTimes(1)
   expect((await POST(req('POST',{endedEarly:true,elapsedSeconds:1,afterNote:'x'.repeat(6501)}),ctx({id:'early'}))).status).toBe(400)
 })
+
+it('records solo overtime up to verified wall-clock elapsed time',async()=>{
+  const {POST}=await import('@/app/api/sessions/[id]/complete/route');const now=Date.now();const startedAt=new Date(now-70000).toISOString();const old=Date.now;Date.now=()=>now
+  queue([{id:'overtime',planned_seconds:60,started_at:startedAt}], [{id:'overtime',completed_date_text:'2026-10-05'}]);expect((await POST(req('POST',{elapsedSeconds:70}),ctx({id:'overtime'}))).status).toBe(200);expect(h.db.mock.calls.at(-1)![1][0]).toBe(70)
+  queue([{id:'bounded',planned_seconds:60,started_at:startedAt}], [{id:'bounded',completed_date_text:'2026-10-05'}]);expect((await POST(req('POST',{elapsedSeconds:90}),ctx({id:'bounded'}))).status).toBe(200);expect(h.db.mock.calls.at(-1)![1][0]).toBe(70);Date.now=old
+})
